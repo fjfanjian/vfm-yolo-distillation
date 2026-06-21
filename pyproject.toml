@@ -1,0 +1,46 @@
+[project]
+name = "vfm-yolo-distillation"
+version = "0.1.0"
+description = "VFM-assisted YOLO distillation for low-label aerial small-object detection."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "rich>=13.7",
+    "typer>=0.12",
+]
+
+[project.optional-dependencies]
+yolo = [
+    "ultralytics>=8.3",
+]
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.21",
+    "pytest>=8.2",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812",
+    "D100",
+    "D104",
+    "D203",
+    "D213",
+]
+
+[tool.basedpyright]
+typeCheckingMode = "all"
+pythonVersion = "3.12"
+include = ["src", "scripts", "tests"]

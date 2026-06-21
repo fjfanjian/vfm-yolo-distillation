@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# Experiment outputs
+runs/
+outputs/
+artifacts/
+wandb/
+mlruns/
+
+# Data and model weights
+data/
+datasets/
+weights/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.engine
+*.trt
+
+# Generated labels
+pseudo_labels/
+*.cache
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

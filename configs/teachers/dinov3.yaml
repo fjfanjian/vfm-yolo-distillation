@@ -1,0 +1,11 @@
+name: dinov3_vitb16
+role: dense_feature_teacher
+weights: /home/fj/dinov3/weights/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+image_size: 640
+patch_size: 16
+feature_dim: 768
+freeze: true
+distillation_targets:
+  - global_feature
+  - small_object_region
+  - token_relation

@@ -1,0 +1,28 @@
+name: yolo_baseline_visdrone
+stage: supervised_baseline
+description: Pure supervised YOLO baseline on VisDrone for full, 25%, and 10% label budgets.
+student:
+  family: ultralytics
+  model: yolo11s.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: full
+training:
+  image_size: 640
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: runs/baselines
+  name: yolo11s_visdrone_full
+metrics:
+  - mAP50-95
+  - mAP50
+  - mAP75
+  - AP_small
+  - AR_small
+  - fps
+  - params
+  - flops
