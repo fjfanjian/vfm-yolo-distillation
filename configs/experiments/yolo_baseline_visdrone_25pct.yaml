@@ -1,12 +1,12 @@
-name: yolo26n_baseline_visdrone
+name: yolo26n_baseline_visdrone_25pct
 stage: supervised_baseline
-description: Pure supervised YOLO26n baseline on the full VisDrone split.
+description: Pure supervised YOLO26n baseline on the 25% labeled VisDrone split.
 student:
   family: ultralytics
   model: yolo26n.pt
 dataset:
   config: configs/datasets/visdrone.yaml
-  label_budget: full
+  label_budget: 25pct
 training:
   image_size: 640
   epochs: 120
@@ -16,7 +16,7 @@ training:
   seed: 42
 outputs:
   project: runs/baselines
-  name: yolo26n_visdrone_full
+  name: yolo26n_visdrone_25pct
 metrics:
   - mAP50-95
   - mAP50

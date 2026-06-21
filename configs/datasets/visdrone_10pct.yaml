@@ -1,5 +1,5 @@
 path: /home/featurize/datasets/visdrone
-train: VisDrone2019-DET-train/images
+train: splits/visdrone/train_10pct.txt
 val: VisDrone2019-DET-val/images
 test: VisDrone2019-DET-test-dev/images
 names:

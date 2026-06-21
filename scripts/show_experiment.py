@@ -1,23 +1,27 @@
 from pathlib import Path
+import sys
 
-import typer
-from rich.console import Console
-from rich.panel import Panel
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 
-from vfm_yolo_distillation.config import load_experiment_config, ultralytics_train_command
-
-
-app = typer.Typer(add_completion=False)
-console = Console()
+from vfm_yolo_distillation.config import load_experiment_config, ultralytics_train_command  # noqa: E402
 
 
-@app.command()
 def main(config_path: Path) -> None:
     config = load_experiment_config(config_path)
-    command = " \\\n+  ".join(ultralytics_train_command(config))
-    console.print(Panel.fit(config.description, title=config.name))
-    console.print(command)
+    line_continuation = " " + "\\" + "\n  "
+    command = line_continuation.join(ultralytics_train_command(config))
+    sys.stdout.write(f"{config.name}: {config.description}\n")
+    sys.stdout.write(f"{command}\n")
+
+
+def run(argv: list[str]) -> int:
+    if len(argv) != 2:
+        sys.stderr.write("Usage: python scripts/show_experiment.py <config-path>\n")
+        return 2
+    main(Path(argv[1]))
+    return 0
 
 
 if __name__ == "__main__":
-    app()
+    raise SystemExit(run(sys.argv))

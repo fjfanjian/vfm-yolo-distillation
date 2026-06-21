@@ -1,0 +1,33 @@
+name: yolo26_baseline_matrix
+stage: supervised_baseline
+description: YOLO26 model-size baseline matrix for VisDrone.
+student:
+  family: ultralytics
+  models:
+    - yolo26n.pt
+    - yolo26s.pt
+    - yolo26m.pt
+    - yolo26l.pt
+    - yolo26x.pt
+dataset:
+  configs:
+    full: configs/datasets/visdrone.yaml
+    50pct: configs/datasets/visdrone_50pct.yaml
+    25pct: configs/datasets/visdrone_25pct.yaml
+    10pct: configs/datasets/visdrone_10pct.yaml
+    5pct: configs/datasets/visdrone_5pct.yaml
+recommended_first_run:
+  model: yolo26n.pt
+  budgets:
+    - full
+    - 25pct
+    - 10pct
+metrics:
+  - mAP50-95
+  - mAP50
+  - mAP75
+  - AP_small
+  - AR_small
+  - fps
+  - params
+  - flops

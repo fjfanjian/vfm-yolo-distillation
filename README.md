@@ -4,11 +4,15 @@
 
 本项目的核心目标不是把 DINOv3 直接放进最终检测网络，而是在训练期利用 DINOv3、Grounding DINO、YOLO-World 等视觉基础模型提供的 dense representation、开放词表伪标签和区域先验，训练一个部署阶段仍然轻量的 YOLO student。
 
+远程训练约束：Featurize 服务器上不要在 `/home/featurize/work` 进行实时编辑、解压、训练或临时写入；该目录只用于长期保存结果、权重等文件。项目代码、数据解压、环境和训练运行目录默认放在 `/home/featurize`。
+
 ## 研究假设
 
 大模型具备更强的通用视觉表征和开放词表能力，但推理成本高；YOLO 部署成熟、速度快，但在少标注、小目标、跨域航拍场景下容易泛化不足。本项目研究如何把大模型知识迁移到 YOLO，使推理阶段不依赖大模型。
 
 ## 初始实验阶段
+
+实验进度跟踪见 [TODO.md](TODO.md)。
 
 ### 阶段 1：纯监督 YOLO 基线
 
@@ -16,10 +20,12 @@
 
 | 实验 | 数据量 | 目的 |
 | --- | ---: | --- |
-| `yolo_baseline_full` | 100% | 生产模型上限 |
-| `yolo_baseline_25pct` | 25% | 少标注性能 |
-| `yolo_baseline_10pct` | 10% | 极少标注性能 |
+| `yolo26n_baseline_visdrone` | 100% | 生产模型上限 |
+| `yolo26n_baseline_visdrone_25pct` | 25% | 少标注性能 |
+| `yolo26n_baseline_visdrone_10pct` | 10% | 极少标注性能 |
 | `yolo_cross_domain` | VisDrone -> UAVDT/自有航拍数据 | 泛化测试 |
+
+YOLO baseline 模型族使用 Ultralytics 官方 YOLO26：`yolo26n.pt`、`yolo26s.pt`、`yolo26m.pt`、`yolo26l.pt`、`yolo26x.pt`。完整矩阵见 `configs/experiments/yolo26_baseline_matrix.yaml`。
 
 ### 阶段 2：开放词表伪标签
 
@@ -59,6 +65,23 @@ uv sync --extra yolo
 
 ```bash
 uv run python scripts/show_experiment.py configs/experiments/yolo_baseline_visdrone.yaml
+```
+
+少标注基线配置会按 `dataset.label_budget` 自动切换训练数据配置：
+
+```bash
+uv run python scripts/show_experiment.py configs/experiments/yolo_baseline_visdrone_25pct.yaml
+uv run python scripts/show_experiment.py configs/experiments/yolo_baseline_visdrone_10pct.yaml
+```
+
+对应的数据集模板位于 `configs/datasets/visdrone_25pct.yaml` 和
+`configs/datasets/visdrone_10pct.yaml`。实际的训练图片清单建议放在数据集根目录下的
+`splits/visdrone/train_*.txt`，不要提交到仓库。
+
+准备 VisDrone 原始数据：
+
+```bash
+python scripts/prepare_visdrone.py /home/featurize/datasets/visdrone
 ```
 
 后续真正训练时，优先调用 Ultralytics 官方训练入口；只有蒸馏需要深度改 loss/trainer 时，再考虑 fork 或 vendor Ultralytics。

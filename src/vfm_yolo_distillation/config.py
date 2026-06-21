@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, assert_never
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 
 StageName = Literal["supervised_baseline", "pseudo_label", "feature_distillation"]
+LabelBudget = Literal["full", "50pct", "25pct", "10pct", "5pct"]
 
 
 class StudentConfig(BaseModel):
@@ -19,7 +20,7 @@ class DatasetRef(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     config: Path
-    label_budget: Literal["full", "50pct", "25pct", "10pct", "5pct"]
+    label_budget: LabelBudget
 
 
 class TrainingConfig(BaseModel):
@@ -79,8 +80,19 @@ def load_experiment_config(path: Path) -> ExperimentConfig:
         raise ConfigLoadError(f"Invalid experiment config: {path}") from exc
 
 
+def training_dataset_config_path(config: ExperimentConfig) -> Path:
+    match config.dataset.label_budget:
+        case "full":
+            return config.dataset.config
+        case "50pct" | "25pct" | "10pct" | "5pct" as budget:
+            source = config.dataset.config
+            return source.with_stem(f"{source.stem}_{budget}")
+        case unreachable:
+            assert_never(unreachable)
+
+
 def ultralytics_train_command(config: ExperimentConfig) -> tuple[str, ...]:
-    data_path = config.dataset.config.as_posix()
+    data_path = training_dataset_config_path(config).as_posix()
     return (
         "yolo",
         "detect",
