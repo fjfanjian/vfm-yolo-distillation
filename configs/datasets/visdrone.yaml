@@ -1,0 +1,20 @@
+name: visdrone
+description: VisDrone-DET aerial small-object detection dataset.
+root: /home/fj/datasets/visdrone
+train_images: VisDrone2019-DET-train/images
+val_images: VisDrone2019-DET-val/images
+test_images: VisDrone2019-DET-test-dev/images
+train_labels: labels/train
+val_labels: labels/val
+test_labels: labels/test-dev
+classes:
+  - pedestrian
+  - people
+  - bicycle
+  - car
+  - van
+  - truck
+  - tricycle
+  - awning-tricycle
+  - bus
+  - motor

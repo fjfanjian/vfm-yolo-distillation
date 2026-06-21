@@ -16,8 +16,8 @@ wandb/
 mlruns/
 
 # Data and model weights
-data/
-datasets/
+/data/
+/datasets/
 weights/
 checkpoints/
 *.pt
