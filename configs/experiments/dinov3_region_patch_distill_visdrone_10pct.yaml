@@ -1,0 +1,35 @@
+name: yolo26n_dinov3_region_patch_distill_visdrone_10pct
+stage: feature_distillation
+description: YOLO26n 10% VisDrone training with GT-region-aware DINOv3 patch-token distillation.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 640
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/featurize/vfm-yolo-distillation/runs/dinov3_distill
+  name: yolo26n_visdrone_10pct_dinov3_region_patch
+metrics:
+  - mAP50-95
+  - mAP50
+  - AP_small
+  - dino_region_loss
+distillation:
+  teacher_repo: /home/featurize/work/dinov3
+  teacher_weights: /home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 448
+  teacher_patch_grid: 28
+  student_layer: 16
+  student_dim: 64
+  teacher_dim: 768
+  box_expand_tokens: 1
+  lambda_region: 0.05

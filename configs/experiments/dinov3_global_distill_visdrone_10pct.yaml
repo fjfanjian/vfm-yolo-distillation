@@ -1,0 +1,33 @@
+name: yolo26n_dinov3_global_distill_visdrone_10pct
+stage: feature_distillation
+description: YOLO26n 10% VisDrone training with frozen DINOv3 ViT-B/16 global feature distillation.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 640
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/featurize/vfm-yolo-distillation/runs/dinov3_distill
+  name: yolo26n_visdrone_10pct_dinov3_global
+metrics:
+  - mAP50-95
+  - mAP50
+  - AP_small
+  - dino_global_loss
+distillation:
+  teacher_repo: /home/featurize/work/dinov3
+  teacher_weights: /home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 224
+  teacher_dim: 768
+  student_layer: 22
+  student_dim: 256
+  lambda_global: 0.1
