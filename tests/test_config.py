@@ -2,12 +2,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+from scripts.prepare_visdrone import convert_split, write_train_splits
 from vfm_yolo_distillation.config import (
     load_experiment_config,
     training_dataset_config_path,
     ultralytics_train_command,
 )
-from scripts.prepare_visdrone import convert_split, write_train_splits
 
 
 def test_load_experiment_config_when_valid_baseline() -> None:
@@ -44,6 +44,18 @@ def test_training_dataset_config_path_when_budget_is_full() -> None:
 
     # Then
     assert dataset_path == Path("configs/datasets/visdrone.yaml")
+
+
+def test_load_experiment_config_when_stage_is_objectness_pretrain() -> None:
+    # Given
+    config_path = Path("configs/experiments/dinov3_objectness_pretrain_visdrone_full_imgsz960.yaml")
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "objectness_pretrain"
+    assert config.training.image_size == 960
 
 
 def test_ultralytics_train_command_when_budget_is_partial() -> None:
@@ -85,7 +97,9 @@ def test_prepare_visdrone_when_annotations_exist(tmp_path: Path) -> None:
     image_dir.mkdir(parents=True)
     annotation_dir.mkdir(parents=True)
     _write_jpeg(image_dir / "000001.jpg", width=100, height=50)
-    (annotation_dir / "000001.txt").write_text("10,5,20,10,1,4,0,0\n0,0,5,5,1,0,0,0\n", encoding="utf-8")
+    (annotation_dir / "000001.txt").write_text(
+        "10,5,20,10,1,4,0,0\n0,0,5,5,1,0,0,0\n", encoding="utf-8"
+    )
 
     # When
     converted = convert_split(dataset_root, "VisDrone2019-DET-train")

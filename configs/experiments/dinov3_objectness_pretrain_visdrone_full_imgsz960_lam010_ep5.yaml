@@ -1,0 +1,37 @@
+name: yolo26n_dinov3_objectness_pretrain_visdrone_full_imgsz960_lam010_ep5
+stage: objectness_pretrain
+description: YOLO26n objectness-only ablation on full VisDrone train images with DINOv3 tiled local-contrast soft maps, lambda=0.1, pretrain_epochs=5.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: full
+training:
+  image_size: 960
+  epochs: 5
+  batch: 8
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/featurize/vfm-yolo-distillation/runs/dinov3_objectness
+  name: yolo26n_visdrone_full_imgsz960_dinov3_objpre_lam010_ep5
+metrics:
+  - objectness_loss
+  - objectness_bce
+  - objectness_dice
+objectness:
+  teacher_repo: /home/featurize/work/dinov3
+  teacher_weights: /home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 448
+  teacher_patch_grid: 28
+  teacher_batch: 16
+  method: local_contrast
+  tile_size: 480
+  tile_stride: 240
+  student_layer: 16
+  student_dim: 64
+  lambda_objectness: 0.1
+  cache: /home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960

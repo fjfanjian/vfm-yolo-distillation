@@ -1,0 +1,28 @@
+name: yolo26n_baseline_visdrone_10pct_imgsz960
+stage: supervised_baseline
+description: Pure supervised YOLO26n baseline on the 10% labeled VisDrone split at imgsz=960.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 960
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/featurize/vfm-yolo-distillation/runs/baselines
+  name: yolo26n_visdrone_10pct_imgsz960
+metrics:
+  - mAP50-95
+  - mAP50
+  - mAP75
+  - AP_small
+  - AR_small
+  - fps
+  - params
+  - flops
