@@ -5,7 +5,11 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 StageName = Literal[
-    "supervised_baseline", "pseudo_label", "feature_distillation", "objectness_pretrain"
+    "supervised_baseline",
+    "pseudo_label",
+    "feature_distillation",
+    "objectness_pretrain",
+    "relation_distillation",
 ]
 LabelBudget = Literal["full", "50pct", "25pct", "10pct", "5pct"]
 

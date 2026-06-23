@@ -58,6 +58,18 @@ def test_load_experiment_config_when_stage_is_objectness_pretrain() -> None:
     assert config.training.image_size == 960
 
 
+def test_load_experiment_config_when_stage_is_relation_distillation() -> None:
+    # Given
+    config_path = Path("configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml")
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "relation_distillation"
+    assert config.training.image_size == 960
+
+
 def test_ultralytics_train_command_when_budget_is_partial() -> None:
     # Given
     config = load_experiment_config(Path("configs/experiments/yolo_baseline_visdrone_25pct.yaml"))
