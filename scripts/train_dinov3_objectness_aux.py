@@ -52,6 +52,7 @@ AuxTargetMode = Literal[
     "small_gt_weighted_soft",
     "peak_ignore_aware",
     "small_crop_soft",
+    "small_tile_soft",
 ]
 
 
@@ -63,6 +64,7 @@ class AuxTargetSettings:
     small_gt: SmallGtWeightMapSettings
     peak: PeakIgnoreSettings
     small_crop: SmallCropTargetSettings
+    small_tile: SmallTileTargetSettings
 
 
 @dataclass(frozen=True, slots=True)
@@ -71,6 +73,16 @@ class SmallCropTargetSettings:
     context_scale: float
     min_crop_size: int
     max_crops_per_image: int
+    weight: float
+
+
+@dataclass(frozen=True, slots=True)
+class SmallTileTargetSettings:
+    small_area_px: float
+    tile_size: int
+    tile_stride: int
+    max_tiles_per_image: int
+    min_small_boxes: int
     weight: float
 
 
@@ -132,6 +144,8 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
         logits = head(feature)
         if self.aux_settings.mode == "small_crop_soft":
             return self._small_crop_soft_loss(logits, batch, images)
+        if self.aux_settings.mode == "small_tile_soft":
+            return self._small_tile_soft_loss(logits, batch, images)
         targets = self._teacher_targets(
             images, image_files(batch, images.shape[0]), tuple(logits.shape[-2:])
         )
@@ -146,6 +160,8 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
                 loss = self._peak_ignore_aware_loss(logits, targets)
             case "small_crop_soft":
                 loss = self._small_crop_soft_loss(logits, batch, images)
+            case "small_tile_soft":
+                loss = self._small_tile_soft_loss(logits, batch, images)
             case unreachable:
                 assert_never(unreachable)
         return loss
@@ -244,6 +260,64 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
         self._apply_small_crop_targets(crop_tensors, target_regions, targets, weights)
         return targets, weights
 
+    def _small_tile_soft_loss(
+        self,
+        logits: torch.Tensor,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+    ) -> torch.Tensor:
+        targets, weights = self._small_tile_targets(
+            batch=batch,
+            images=images,
+            target_size=tuple(logits.shape[-2:]),
+        )
+        if weights.sum() <= 0:
+            return logits.sum() * 0.0
+        return (
+            weighted_soft_objectness_loss(logits, targets, weights)
+            * self.objectness_settings.lambda_objectness
+        )
+
+    def _small_tile_targets(
+        self,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+        target_size: tuple[int, int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        batch_idx = tensor_value(batch, "batch_idx").to(device=images.device)
+        bboxes = tensor_value(batch, "bboxes").to(device=images.device)
+        targets = images.new_zeros((images.shape[0], 1, target_size[0], target_size[1]))
+        weights = images.new_zeros(targets.shape)
+        if bboxes.numel() == 0:
+            return targets, weights
+
+        image_h, image_w = images.shape[-2:]
+        tile_tensors: list[torch.Tensor] = []
+        target_regions: list[tuple[int, int, int, int, int]] = []
+        for image_index in range(images.shape[0]):
+            tiles = self._small_dense_tiles(batch_idx, bboxes, image_index, image_h, image_w)
+            for tile in tiles[: self.aux_settings.small_tile.max_tiles_per_image]:
+                left, top, right, bottom = tile
+                target_left, target_top, target_right, target_bottom = (
+                    self._target_bounds_for_crop(tile, (image_h, image_w), target_size)
+                )
+                tile_tensor = images[image_index, :, top:bottom, left:right].unsqueeze(0)
+                resized = functional.interpolate(
+                    tile_tensor,
+                    size=(
+                        self.objectness_settings.teacher_image_size,
+                        self.objectness_settings.teacher_image_size,
+                    ),
+                    mode="bilinear",
+                    align_corners=False,
+                ).squeeze(0)
+                tile_tensors.append(resized)
+                target_regions.append(
+                    (image_index, target_left, target_top, target_right, target_bottom)
+                )
+        self._apply_tile_targets(tile_tensors, target_regions, targets, weights)
+        return targets, weights
+
     def _apply_small_crop_targets(
         self,
         crop_tensors: list[torch.Tensor],
@@ -260,6 +334,23 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             regions = target_regions[start : start + teacher_batch]
             for token, region in zip(tokens, regions, strict=True):
                 self._apply_one_crop_target(token, region, targets, weights)
+
+    def _apply_tile_targets(
+        self,
+        tile_tensors: list[torch.Tensor],
+        target_regions: list[tuple[int, int, int, int, int]],
+        targets: torch.Tensor,
+        weights: torch.Tensor,
+    ) -> None:
+        if not tile_tensors:
+            return
+        teacher_batch = self.objectness_settings.teacher_batch
+        for start in range(0, len(tile_tensors), teacher_batch):
+            batch_tiles = torch.stack(tile_tensors[start : start + teacher_batch])
+            tokens = self._teacher_tokens(batch_tiles)
+            regions = target_regions[start : start + teacher_batch]
+            for token, region in zip(tokens, regions, strict=True):
+                self._apply_one_tile_target(token, region, targets, weights)
 
     def _apply_one_crop_target(
         self,
@@ -290,6 +381,35 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             current_weight.new_tensor(self.aux_settings.small_crop.weight),
         )
 
+    def _apply_one_tile_target(
+        self,
+        token: torch.Tensor,
+        region: tuple[int, int, int, int, int],
+        targets: torch.Tensor,
+        weights: torch.Tensor,
+    ) -> None:
+        image_index, target_left, target_top, target_right, target_bottom = region
+        tile_score = objectness_score(
+            token,
+            self.objectness_settings.teacher_patch_grid,
+            self.objectness_settings.method,
+        )
+        resized = functional.interpolate(
+            tile_score[None, None],
+            size=(target_bottom - target_top, target_right - target_left),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(0).squeeze(0)
+        current_target = targets[image_index, 0, target_top:target_bottom, target_left:target_right]
+        targets[image_index, 0, target_top:target_bottom, target_left:target_right] = torch.maximum(
+            current_target, resized
+        )
+        current_weight = weights[image_index, 0, target_top:target_bottom, target_left:target_right]
+        weights[image_index, 0, target_top:target_bottom, target_left:target_right] = torch.maximum(
+            current_weight,
+            current_weight.new_tensor(self.aux_settings.small_tile.weight),
+        )
+
     def _small_box_indices(
         self,
         batch_idx: torch.Tensor,
@@ -307,6 +427,47 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             if area_px <= self.aux_settings.small_crop.small_area_px:
                 selected.append((area_px, index))
         return [index for _area, index in sorted(selected)]
+
+    def _small_dense_tiles(
+        self,
+        batch_idx: torch.Tensor,
+        bboxes: torch.Tensor,
+        image_index: int,
+        image_h: int,
+        image_w: int,
+    ) -> list[tuple[int, int, int, int]]:
+        centers: list[tuple[float, float]] = []
+        areas: list[float] = []
+        for index in range(bboxes.shape[0]):
+            if int(batch_idx[index].item()) != image_index:
+                continue
+            x_center, y_center, box_w, box_h = bboxes[index]
+            area_px = float((box_w * image_w * box_h * image_h).item())
+            if area_px > self.aux_settings.small_tile.small_area_px:
+                continue
+            centers.append((float((x_center * image_w).item()), float((y_center * image_h).item())))
+            areas.append(area_px)
+        if not centers:
+            return []
+
+        tile_settings = self.aux_settings.small_tile
+        candidates: list[tuple[int, float, tuple[int, int, int, int]]] = []
+        for top in _tile_starts(image_h, tile_settings.tile_size, tile_settings.tile_stride):
+            bottom = min(image_h, top + tile_settings.tile_size)
+            for left in _tile_starts(image_w, tile_settings.tile_size, tile_settings.tile_stride):
+                right = min(image_w, left + tile_settings.tile_size)
+                matched_areas = [
+                    areas[index]
+                    for index, (center_x, center_y) in enumerate(centers)
+                    if left <= center_x < right and top <= center_y < bottom
+                ]
+                count = len(matched_areas)
+                if count < tile_settings.min_small_boxes:
+                    continue
+                mean_area = sum(matched_areas) / max(count, 1)
+                candidates.append((count, -mean_area, (left, top, right, bottom)))
+        candidates.sort(reverse=True)
+        return [tile for _count, _mean_area, tile in candidates]
 
     def _crop_bounds_for_box(
         self, bbox_xywhn: torch.Tensor, image_size: tuple[int, int]
@@ -386,6 +547,7 @@ def aux_target_mode(value: str) -> AuxTargetMode:
             | "small_gt_weighted_soft"
             | "peak_ignore_aware"
             | "small_crop_soft"
+            | "small_tile_soft"
         ):
             return value
         case _:
@@ -427,6 +589,16 @@ def aux_target_settings_from_config(path: Path) -> AuxTargetSettings:
             max_crops_per_image=int(objectness.get("max_crops_per_image", 12)),
             weight=float(objectness.get("crop_weight", 1.0)),
         ),
+        small_tile=SmallTileTargetSettings(
+            small_area_px=float(objectness.get("small_area_px", 1024.0)),
+            tile_size=int(objectness.get("density_tile_size", objectness.get("tile_size", 480))),
+            tile_stride=int(
+                objectness.get("density_tile_stride", objectness.get("tile_stride", 240))
+            ),
+            max_tiles_per_image=int(objectness.get("max_tiles_per_image", 4)),
+            min_small_boxes=int(objectness.get("min_small_boxes_per_tile", 3)),
+            weight=float(objectness.get("tile_weight", 1.0)),
+        ),
     )
 
 
@@ -441,6 +613,16 @@ def _clamp_crop(
     left = min(max(0, left), image_w - crop_w)
     top = min(max(0, top), image_h - crop_h)
     return left, top, left + crop_w, top + crop_h
+
+
+def _tile_starts(length: int, tile_size: int, stride: int) -> list[int]:
+    tile_size = max(1, min(length, tile_size))
+    stride = max(1, stride)
+    starts = list(range(0, max(1, length - tile_size + 1), stride))
+    last = length - tile_size
+    if not starts or starts[-1] != last:
+        starts.append(last)
+    return starts
 
 
 def aux_trainer_overrides(settings: TrainSettings) -> dict[str, str | int | float | bool]:
