@@ -9,6 +9,7 @@ StageName = Literal[
     "pseudo_label",
     "feature_distillation",
     "objectness_pretrain",
+    "objectness_auxiliary",
     "relation_distillation",
 ]
 LabelBudget = Literal["full", "50pct", "25pct", "10pct", "5pct"]
