@@ -25,6 +25,7 @@ from train_dinov3_objectness_pretrain import (
     dice_loss,
     expect_mapping,
     image_files,
+    objectness_score,
     parse_args,
     read_yaml,
     settings_from_config,
@@ -50,6 +51,7 @@ AuxTargetMode = Literal[
     "ignore_aware",
     "small_gt_weighted_soft",
     "peak_ignore_aware",
+    "small_crop_soft",
 ]
 
 
@@ -60,6 +62,16 @@ class AuxTargetSettings:
     negative_quantile: float
     small_gt: SmallGtWeightMapSettings
     peak: PeakIgnoreSettings
+    small_crop: SmallCropTargetSettings
+
+
+@dataclass(frozen=True, slots=True)
+class SmallCropTargetSettings:
+    small_area_px: float
+    context_scale: float
+    min_crop_size: int
+    max_crops_per_image: int
+    weight: float
 
 
 class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
@@ -118,20 +130,25 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
         if not isinstance(feature, torch.Tensor) or not isinstance(head, nn.Conv2d):
             return images.sum() * 0.0
         logits = head(feature)
+        if self.aux_settings.mode == "small_crop_soft":
+            return self._small_crop_soft_loss(logits, batch, images)
         targets = self._teacher_targets(
             images, image_files(batch, images.shape[0]), tuple(logits.shape[-2:])
         )
         match self.aux_settings.mode:
             case "soft":
-                return self._soft_loss(logits, targets)
+                loss = self._soft_loss(logits, targets)
             case "ignore_aware":
-                return self._ignore_aware_loss(logits, targets)
+                loss = self._ignore_aware_loss(logits, targets)
             case "small_gt_weighted_soft":
-                return self._small_gt_weighted_loss(logits, targets, batch, images)
+                loss = self._small_gt_weighted_loss(logits, targets, batch, images)
             case "peak_ignore_aware":
-                return self._peak_ignore_aware_loss(logits, targets)
+                loss = self._peak_ignore_aware_loss(logits, targets)
+            case "small_crop_soft":
+                loss = self._small_crop_soft_loss(logits, batch, images)
             case unreachable:
                 assert_never(unreachable)
+        return loss
 
     def _soft_loss(self, logits: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
         bce = functional.binary_cross_entropy_with_logits(logits, targets)
@@ -166,6 +183,167 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             weighted_soft_objectness_loss(logits, targets, weights)
             * self.objectness_settings.lambda_objectness
         )
+
+    def _small_crop_soft_loss(
+        self,
+        logits: torch.Tensor,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+    ) -> torch.Tensor:
+        targets, weights = self._small_crop_targets(
+            batch=batch,
+            images=images,
+            target_size=tuple(logits.shape[-2:]),
+        )
+        if weights.sum() <= 0:
+            return logits.sum() * 0.0
+        return (
+            weighted_soft_objectness_loss(logits, targets, weights)
+            * self.objectness_settings.lambda_objectness
+        )
+
+    def _small_crop_targets(
+        self,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+        target_size: tuple[int, int],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        batch_idx = tensor_value(batch, "batch_idx").to(device=images.device)
+        bboxes = tensor_value(batch, "bboxes").to(device=images.device)
+        targets = images.new_zeros((images.shape[0], 1, target_size[0], target_size[1]))
+        weights = images.new_zeros(targets.shape)
+        if bboxes.numel() == 0:
+            return targets, weights
+
+        image_h, image_w = images.shape[-2:]
+        crop_settings = self.aux_settings.small_crop
+        crop_tensors: list[torch.Tensor] = []
+        target_regions: list[tuple[int, int, int, int, int]] = []
+        for image_index in range(images.shape[0]):
+            indices = self._small_box_indices(batch_idx, bboxes, image_index, image_h, image_w)
+            for box_index in indices[: crop_settings.max_crops_per_image]:
+                crop = self._crop_bounds_for_box(bboxes[box_index], (image_h, image_w))
+                left, top, right, bottom = crop
+                target_left, target_top, target_right, target_bottom = (
+                    self._target_bounds_for_crop(crop, (image_h, image_w), target_size)
+                )
+                crop_tensor = images[image_index, :, top:bottom, left:right].unsqueeze(0)
+                resized = functional.interpolate(
+                    crop_tensor,
+                    size=(
+                        self.objectness_settings.teacher_image_size,
+                        self.objectness_settings.teacher_image_size,
+                    ),
+                    mode="bilinear",
+                    align_corners=False,
+                ).squeeze(0)
+                crop_tensors.append(resized)
+                target_regions.append(
+                    (image_index, target_left, target_top, target_right, target_bottom)
+                )
+        self._apply_small_crop_targets(crop_tensors, target_regions, targets, weights)
+        return targets, weights
+
+    def _apply_small_crop_targets(
+        self,
+        crop_tensors: list[torch.Tensor],
+        target_regions: list[tuple[int, int, int, int, int]],
+        targets: torch.Tensor,
+        weights: torch.Tensor,
+    ) -> None:
+        if not crop_tensors:
+            return
+        teacher_batch = self.objectness_settings.teacher_batch
+        for start in range(0, len(crop_tensors), teacher_batch):
+            batch_crops = torch.stack(crop_tensors[start : start + teacher_batch])
+            tokens = self._teacher_tokens(batch_crops)
+            regions = target_regions[start : start + teacher_batch]
+            for token, region in zip(tokens, regions, strict=True):
+                self._apply_one_crop_target(token, region, targets, weights)
+
+    def _apply_one_crop_target(
+        self,
+        token: torch.Tensor,
+        region: tuple[int, int, int, int, int],
+        targets: torch.Tensor,
+        weights: torch.Tensor,
+    ) -> None:
+        image_index, target_left, target_top, target_right, target_bottom = region
+        crop_score = objectness_score(
+            token,
+            self.objectness_settings.teacher_patch_grid,
+            self.objectness_settings.method,
+        )
+        resized = functional.interpolate(
+            crop_score[None, None],
+            size=(target_bottom - target_top, target_right - target_left),
+            mode="bilinear",
+            align_corners=False,
+        ).squeeze(0).squeeze(0)
+        current_target = targets[image_index, 0, target_top:target_bottom, target_left:target_right]
+        targets[image_index, 0, target_top:target_bottom, target_left:target_right] = torch.maximum(
+            current_target, resized
+        )
+        current_weight = weights[image_index, 0, target_top:target_bottom, target_left:target_right]
+        weights[image_index, 0, target_top:target_bottom, target_left:target_right] = torch.maximum(
+            current_weight,
+            current_weight.new_tensor(self.aux_settings.small_crop.weight),
+        )
+
+    def _small_box_indices(
+        self,
+        batch_idx: torch.Tensor,
+        bboxes: torch.Tensor,
+        image_index: int,
+        image_h: int,
+        image_w: int,
+    ) -> list[int]:
+        selected: list[tuple[float, int]] = []
+        for index in range(bboxes.shape[0]):
+            if int(batch_idx[index].item()) != image_index:
+                continue
+            _x, _y, box_w, box_h = bboxes[index]
+            area_px = float((box_w * image_w * box_h * image_h).item())
+            if area_px <= self.aux_settings.small_crop.small_area_px:
+                selected.append((area_px, index))
+        return [index for _area, index in sorted(selected)]
+
+    def _crop_bounds_for_box(
+        self, bbox_xywhn: torch.Tensor, image_size: tuple[int, int]
+    ) -> tuple[int, int, int, int]:
+        image_h, image_w = image_size
+        x_center, y_center, box_w, box_h = bbox_xywhn
+        crop_settings = self.aux_settings.small_crop
+        width_px = max(
+            float((box_w * image_w * crop_settings.context_scale).item()),
+            float(crop_settings.min_crop_size),
+        )
+        height_px = max(
+            float((box_h * image_h * crop_settings.context_scale).item()),
+            float(crop_settings.min_crop_size),
+        )
+        center_x = float((x_center * image_w).item())
+        center_y = float((y_center * image_h).item())
+        left = round(center_x - width_px * 0.5)
+        right = round(center_x + width_px * 0.5)
+        top = round(center_y - height_px * 0.5)
+        bottom = round(center_y + height_px * 0.5)
+        return _clamp_crop((left, top, right, bottom), image_size)
+
+    @staticmethod
+    def _target_bounds_for_crop(
+        crop: tuple[int, int, int, int],
+        image_size: tuple[int, int],
+        target_size: tuple[int, int],
+    ) -> tuple[int, int, int, int]:
+        left, top, right, bottom = crop
+        image_h, image_w = image_size
+        target_h, target_w = target_size
+        target_left = max(0, round(left * target_w / image_w))
+        target_right = min(target_w, max(target_left + 1, round(right * target_w / image_w)))
+        target_top = max(0, round(top * target_h / image_h))
+        target_bottom = min(target_h, max(target_top + 1, round(bottom * target_h / image_h)))
+        return target_left, target_top, target_right, target_bottom
 
     def _weighted_label_loss(
         self, logits: torch.Tensor, labels: torch.Tensor, weights: torch.Tensor
@@ -202,7 +380,13 @@ def masked_dice_loss(
 
 def aux_target_mode(value: str) -> AuxTargetMode:
     match value:
-        case "soft" | "ignore_aware" | "small_gt_weighted_soft" | "peak_ignore_aware":
+        case (
+            "soft"
+            | "ignore_aware"
+            | "small_gt_weighted_soft"
+            | "peak_ignore_aware"
+            | "small_crop_soft"
+        ):
             return value
         case _:
             message = f"Unsupported auxiliary target mode: {value}"
@@ -236,7 +420,27 @@ def aux_target_settings_from_config(path: Path) -> AuxTargetSettings:
             negative_quantile=float(objectness.get("negative_quantile", 0.45)),
             peak_kernel=int(objectness.get("peak_kernel", 3)),
         ),
+        small_crop=SmallCropTargetSettings(
+            small_area_px=float(objectness.get("small_area_px", 1024.0)),
+            context_scale=float(objectness.get("crop_context_scale", 6.0)),
+            min_crop_size=int(objectness.get("crop_min_size", 160)),
+            max_crops_per_image=int(objectness.get("max_crops_per_image", 12)),
+            weight=float(objectness.get("crop_weight", 1.0)),
+        ),
     )
+
+
+def _clamp_crop(
+    crop: tuple[int, int, int, int],
+    image_size: tuple[int, int],
+) -> tuple[int, int, int, int]:
+    left, top, right, bottom = crop
+    image_h, image_w = image_size
+    crop_w = min(image_w, max(1, right - left))
+    crop_h = min(image_h, max(1, bottom - top))
+    left = min(max(0, left), image_w - crop_w)
+    top = min(max(0, top), image_h - crop_h)
+    return left, top, left + crop_w, top + crop_h
 
 
 def aux_trainer_overrides(settings: TrainSettings) -> dict[str, str | int | float | bool]:

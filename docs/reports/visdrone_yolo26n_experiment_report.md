@@ -1030,7 +1030,82 @@ python scripts/audit_dinov3_target_alignment.py \
 - overlay：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/overlays/`
 - 日志：`runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log`
 
-## 19. 总体结论
+## 19. DINOv3 small-object crop objectness auxiliary：seed42 screening（运行中）
+
+### 实验目的
+
+第 18 节 target alignment audit 显示，full-image tiled local-contrast target 的高响应区域约 90% 落在 GT 外，且 top-q 高响应落在 small GT 的比例只有约 1.6%。因此本轮不再继续调大 `lambda` 或给 full-image target 加权，而是把 teacher target 生成限制到小目标局部上下文。
+
+核心假设：如果 DINOv3 在 small GT 周围的局部 crop 内生成 objectness target，再将该 target 投回 YOLO student feature map，对 small AP 的帮助应强于 full-image dense target。
+
+### 配置
+
+- 实验名：`yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42`
+- 训练脚本：`scripts/train_dinov3_objectness_aux.py`
+- 配置文件：`configs/experiments/dinov3_objectness_aux_smallcrop_visdrone_10pct_imgsz960_lam002_seed42.yaml`
+- 数据：VisDrone train 10% label budget，val 使用完整验证集。
+- 模型：YOLO26n，部署期仍为 YOLO-only。
+- 输入分辨率：`imgsz=960`
+- epoch：`120`
+- batch：`16`
+- seed：`42`
+- student layer：`16`
+- `lambda_objectness=0.02`
+- `target_mode=small_crop_soft`
+- small 定义：`area <= 1024 px`
+- crop 参数：`crop_context_scale=8.0`、`crop_min_size=192`、`max_crops_per_image=8`、`crop_weight=1.0`
+- DINOv3 teacher：ViT-B/16，`teacher_image_size=448`，`method=local_contrast`
+
+### 核心逻辑
+
+1. 在每个训练 batch 中读取 small GT box。
+2. 对每张图最多选取 8 个 small box，按目标框中心裁局部 crop。
+3. 将 crop resize 到 DINOv3 输入尺寸，在局部上下文内生成 local-contrast objectness target。
+4. 将 crop target resize 并投回 student layer 16 对应的 feature map 区域。
+5. 只在这些小目标局部区域计算 weighted soft objectness auxiliary loss；全图其他区域权重为 0，避免道路、纹理、大背景区域主导辅助梯度。
+6. 检测主 loss 仍正常使用 10% 标注数据，DINOv3 只作为训练时 teacher target，不进入推理部署。
+
+### 启动命令
+
+```bash
+PYTHONPATH=src:scripts python scripts/train_dinov3_objectness_aux.py \
+  --config configs/experiments/dinov3_objectness_aux_smallcrop_visdrone_10pct_imgsz960_lam002_seed42.yaml
+```
+
+远程后台启动命令：
+
+```bash
+nohup env PYTHONPATH=src:scripts python scripts/train_dinov3_objectness_aux.py \
+  --config configs/experiments/dinov3_objectness_aux_smallcrop_visdrone_10pct_imgsz960_lam002_seed42.yaml   > runs/dinov3_objectness/logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42.log 2>&1 &
+```
+
+### 当前状态
+
+- 启动时间：2026-06-24
+- 远程 PID：`107438`
+- 初始检查：已进入训练循环，GPU 显存约 12.8GB，无 OOM 或 Traceback。
+- 观察到已进入 epoch 2/120。
+- 训练日志：`runs/dinov3_objectness/logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42.log`
+- 结果目录：`runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42`
+- PID 文件：`runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42.pid`
+
+### 判定标准
+
+训练完成后执行：
+
+1. 读取 `results.csv`，记录 best epoch、mAP50、mAP50-95、precision、recall、dino_objectness_loss。
+2. 对 `best.pt` 做 clean `YOLO()` 加载验证。
+3. 对 `best.pt` 执行 small/medium/large AP 统计。
+4. 导出 ONNX，确认部署链路仍为 YOLO-only。
+5. 若 `small AP50-95 >= 0.1170` 且 overall `mAP50-95 >= 0.14439`，进入多 seed；否则停止扩展，改做 crop 策略或 layer 消融。
+
+### 预期观察点
+
+- 如果 small AP 提升但 overall 不提升，说明局部 target 可能有效但权重或作用范围需要调节。
+- 如果 overall 提升但 small AP 不提升，说明仍可能主要收益于 medium/large 或背景正则化。
+- 如果 small/overall 均不提升，说明问题可能不是 target 空间范围，而是 student layer 16 或 objectness auxiliary 形式与检测头不匹配，下一步应转向 layer 19 / multi-layer 消融。
+
+## 20. 总体结论
 
 - DINOv3 target alignment audit 进一步证明，当前 tiled local-contrast target 的高响应区域约 90% 落在 GT 外，top-q 高响应落在 small GT 的比例只有约 1.6%；small box 的 q85 命中率仅 0.3057，明显低于 medium 的 0.5525 和 large 的 0.8188。因此 small AP 无法提升的关键原因是 teacher target 对小目标空间对齐不足，而不是单纯 loss 权重不足。
 - 小目标定向 target-focus screening 显示，`small_gt_weighted_soft` 的 overall mAP50-95=0.1455 略高于 baseline，但 small AP50-95=0.1157，低于 baseline；`peak_ignore_aware` 的 overall 和 small AP 均未达标。因此本轮不应补多 seed，应转入 target 审计，重点检查 DINO local-contrast target 对小目标中心、边缘纹理和道路背景的响应分布。
@@ -1047,7 +1122,7 @@ python scripts/audit_dinov3_target_alignment.py \
 - 但是，第 12-13 节训练实验表明：把 tiled local_contrast 作为纯 objectness pretrain 密集监督后，所有 10%/960 fine-tune 结果均低于 baseline；最佳消融 mAP50-95=0.1338，仍低于 baseline=0.1444。
 - 因此当前结论是：DINOv3 确实能提供类别无关局部显著性，但“纯 objectness pretrain -> 监督微调”的桥接方式会产生负迁移；检测任务主导、低权重的 weak objectness auxiliary 是目前更可靠的桥接方式，其中 `soft lambda=0.02` 是当前最稳的 overall mAP 候选，但还没有解决 small object AP。下一步应把重点从继续调 lambda 转向“让 teacher objectness 更聚焦小目标”的目标构造与对齐策略。
 
-## 20. 下一步计划
+## 21. 下一步计划
 
 1. 停止继续扩大纯 objectness pretrain 网格，不再单独尝试更长 epoch 或更大 lambda。
 2. 暂停继续扩大 lambda 网格；`soft lambda=0.02` 可保留为 overall mAP 主候选，但不能作为小目标路线的最终证据。
@@ -1056,8 +1131,11 @@ python scripts/audit_dinov3_target_alignment.py \
 5. 若 crop/tile mining 任一 arm 达标，再补 `seed=2026`、`seed=3407`；若仍不达标，再做 layer 16/19/multi-layer 消融，确认是不是辅助层级不匹配。
 6. 继续保持 clean-weight 与 ONNX 导出作为每个候选配置的必检项，确保部署链路始终是 YOLO-only。
 
-## 21. 文件索引
+## 22. 文件索引
 
+- DINOv3 small-object crop auxiliary 配置：`configs/experiments/dinov3_objectness_aux_smallcrop_visdrone_10pct_imgsz960_lam002_seed42.yaml`
+- DINOv3 small-object crop auxiliary 日志：`runs/dinov3_objectness/logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42.log`
+- DINOv3 small-object crop auxiliary 结果目录：`runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcrop_lam002_seed42`
 - DINOv3 target alignment audit 脚本：`scripts/audit_dinov3_target_alignment.py`
 - DINOv3 target alignment audit 输出：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300`
 - DINOv3 target alignment audit 日志：`runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log`
