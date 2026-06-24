@@ -12,331 +12,130 @@
 <body>
 <div class="report-header">
 <h1>VisDrone YOLO26n 实验主报告（详细版）</h1>
-<div class="subtitle">统一主报告 · 参数、步骤、结果、分析与复现路径 · 2026-06-24T13:52:07+08:00</div>
+<div class="subtitle">统一主报告 · 参数、步骤、结果、分析与复现路径 · 2026-06-24T14:30:44+08:00</div>
 </div>
 <div class="container">
-<section class="section">
-<div class="section-header"><span class="section-number">01</span> 报告范围</div>
-<div class="section-body">
-<p>本报告是当前统一主报告，覆盖 baseline、分辨率实验、DINOv3 global/patch/region-aware 蒸馏、DINOv3 类别无关 objectness 审计、tiled objectness 预训练，以及 objectness 负迁移定位消融。各实验目录保留原始产物，本报告汇总配置、步骤、结果、分析与复现路径。</p>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">02</span> 总览指标</div>
-<div class="section-body">
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>baseline_25pct_640</td><td>105</td><td>0.3607</td><td>0.2834</td><td>0.2386</td><td>0.1282</td><td>0.2323</td><td>0.1248</td></tr><tr><td>baseline_full_640</td><td>101</td><td>0.4514</td><td>0.3379</td><td>0.3168</td><td>0.1762</td><td>0.3111</td><td>0.1716</td></tr><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.2542</td><td>0.1420</td></tr><tr><td>baseline_full_train960</td><td>82</td><td>0.5392</td><td>0.4102</td><td>0.4110</td><td>0.2424</td><td>0.4078</td><td>0.2402</td></tr><tr><td>objectness_lam100_ep20_ft</td><td>100</td><td>0.3587</td><td>0.2840</td><td>0.2366</td><td>0.1295</td><td>0.2321</td><td>0.1262</td></tr><tr><td>objectness_lam010_ep5_ft</td><td>100</td><td>0.3537</td><td>0.2904</td><td>0.2415</td><td>0.1329</td><td>0.2368</td><td>0.1302</td></tr><tr><td>objectness_lam010_ep10_ft</td><td>107</td><td>0.3545</td><td>0.2824</td><td>0.2371</td><td>0.1295</td><td>0.2325</td><td>0.1271</td></tr><tr><td>objectness_lam025_ep5_ft</td><td>110</td><td>0.3423</td><td>0.2973</td><td>0.2425</td><td>0.1338</td><td>0.2380</td><td>0.1317</td></tr><tr><td>dinov3_global_10pct_640</td><td>81</td><td>0.3052</td><td>0.2374</td><td>0.1885</td><td>0.1015</td><td>0.1830</td><td>0.0973</td></tr><tr><td>dinov3_patch_b16_partial</td><td>45</td><td>0.2763</td><td>0.2412</td><td>0.1762</td><td>0.0920</td><td>0.1725</td><td>0.0901</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>99</td><td>0.3135</td><td>0.2449</td><td>0.1924</td><td>0.1004</td><td>0.1850</td><td>0.0973</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>107</td><td>0.3050</td><td>0.2458</td><td>0.1920</td><td>0.1018</td><td>0.1865</td><td>0.0982</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>85</td><td>0.3703</td><td>0.3024</td><td>0.2614</td><td>0.1455</td><td>0.2557</td><td>0.1420</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>81</td><td>0.3692</td><td>0.2995</td><td>0.2588</td><td>0.1442</td><td>0.2535</td><td>0.1400</td></tr></tbody></table></div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">03</span> 标签预算 baseline：10% / 25% / full，imgsz=640</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>模型：YOLO26n</li>
-<li>训练输入：640</li>
-<li>epoch：120</li>
-<li>数据：VisDrone train 按标签预算抽样，val 使用完整验证集</li>
-<li>优化器：Ultralytics auto AdamW</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 分别训练 10%、25%、full 三个标签预算 baseline。</li>
-<li>2. 读取各自 results.csv，按 best mAP50-95 选取最佳 epoch。</li>
-<li>3. 对 10%/25%/full 关键模型执行 small/medium/large AP 统计。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>baseline_25pct_640</td><td>105</td><td>0.3607</td><td>0.2834</td><td>0.2386</td><td>0.1282</td><td>0.2323</td><td>0.1248</td></tr><tr><td>baseline_full_640</td><td>101</td><td>0.4514</td><td>0.3379</td><td>0.3168</td><td>0.1762</td><td>0.3111</td><td>0.1716</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>标签预算提升带来稳定收益：10% mAP50-95=0.1007，25%=0.1282，full=0.1762。</li>
-<li>10% baseline 是后续 DINOv3 蒸馏的主要对照组。</li>
-<li>full baseline 与 10% baseline 差距明显，说明当前问题首先是低标签数据效率，而不是单纯模型容量。</li>
-</ul>
+<section class="section"><div class="section-header"><span class="section-number">01</span> 报告范围</div><div class="section-body"><p>本报告是当前统一主报告，覆盖 baseline、分辨率实验、DINOv3 global/patch/region-aware 蒸馏、DINOv3 类别无关 objectness 审计、tiled objectness 预训练，以及 objectness 负迁移定位消融。各实验目录保留原始产物，本报告汇总配置、步骤、结果、分析与复现路径。</p></div></section><section class="section"><div class="section-header"><span class="section-number">02</span> 总览指标</div><div class="section-body"><div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>baseline_25pct_640</td><td>105</td><td>0.3607</td><td>0.2834</td><td>0.2386</td><td>0.1282</td><td>0.2323</td><td>0.1248</td></tr><tr><td>baseline_full_640</td><td>101</td><td>0.4514</td><td>0.3379</td><td>0.3168</td><td>0.1762</td><td>0.3111</td><td>0.1716</td></tr><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.2542</td><td>0.1420</td></tr><tr><td>baseline_full_train960</td><td>82</td><td>0.5392</td><td>0.4102</td><td>0.4110</td><td>0.2424</td><td>0.4078</td><td>0.2402</td></tr><tr><td>objectness_lam100_ep20_ft</td><td>100</td><td>0.3587</td><td>0.2840</td><td>0.2366</td><td>0.1295</td><td>0.2321</td><td>0.1262</td></tr><tr><td>objectness_lam010_ep5_ft</td><td>100</td><td>0.3537</td><td>0.2904</td><td>0.2415</td><td>0.1329</td><td>0.2368</td><td>0.1302</td></tr><tr><td>objectness_lam010_ep10_ft</td><td>107</td><td>0.3545</td><td>0.2824</td><td>0.2371</td><td>0.1295</td><td>0.2325</td><td>0.1271</td></tr><tr><td>objectness_lam025_ep5_ft</td><td>110</td><td>0.3423</td><td>0.2973</td><td>0.2425</td><td>0.1338</td><td>0.2380</td><td>0.1317</td></tr><tr><td>dinov3_global_10pct_640</td><td>81</td><td>0.3052</td><td>0.2374</td><td>0.1885</td><td>0.1015</td><td>0.1830</td><td>0.0973</td></tr><tr><td>dinov3_patch_b16_partial</td><td>45</td><td>0.2763</td><td>0.2412</td><td>0.1762</td><td>0.0920</td><td>0.1725</td><td>0.0901</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>99</td><td>0.3135</td><td>0.2449</td><td>0.1924</td><td>0.1004</td><td>0.1850</td><td>0.0973</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>107</td><td>0.3050</td><td>0.2458</td><td>0.1920</td><td>0.1018</td><td>0.1865</td><td>0.0982</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>85</td><td>0.3703</td><td>0.3024</td><td>0.2614</td><td>0.1455</td><td>0.2557</td><td>0.1420</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>81</td><td>0.3692</td><td>0.2995</td><td>0.2588</td><td>0.1442</td><td>0.2535</td><td>0.1400</td></tr></tbody></table></div></div></section><section class="section"><div class="section-header"><span class="section-number">03</span> 标签预算 baseline：10% / 25% / full，imgsz=640</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>模型：YOLO26n</li><li>训练输入：640</li><li>epoch：120</li><li>数据：VisDrone train 按标签预算抽样，val 使用完整验证集</li><li>优化器：Ultralytics auto AdamW</li></ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">04</span> 分辨率实验：full-label 640/960/1280 验证与 960 训练</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>模型：YOLO26n full-label baseline</li>
-<li>对比：640 训练模型在 640/960/1280 下验证，以及 imgsz=960 训练模型</li>
-<li>指标：整体 mAP 与 small/medium/large AP</li>
-<li>权重：full baseline best.pt 与 full train960 best.pt</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 先对 full-label 640 训练模型做 640、960、1280 多分辨率验证。</li>
-<li>2. 再补充 full-label imgsz=960 训练。</li>
-<li>3. 对 960 训练模型执行 area AP 统计并归档。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>分别训练 10%、25%、full 三个标签预算 baseline。</li><li>读取各自 results.csv，按 best mAP50-95 选取最佳 epoch。</li><li>对 10%/25%/full 关键模型执行 small/medium/large AP 统计。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>baseline_25pct_640</td><td>105</td><td>0.3607</td><td>0.2834</td><td>0.2386</td><td>0.1282</td><td>0.2323</td><td>0.1248</td></tr><tr><td>baseline_full_640</td><td>101</td><td>0.4514</td><td>0.3379</td><td>0.3168</td><td>0.1762</td><td>0.3111</td><td>0.1716</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>标签预算提升带来稳定收益：10% mAP50-95=0.1007，25%=0.1282，full=0.1762。</li><li>10% baseline 是后续 DINOv3 蒸馏的主要对照组。</li><li>full baseline 与 10% baseline 差距明显，说明当前问题首先是低标签数据效率，而不是单纯模型容量。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">04</span> 分辨率实验：full-label 640/960/1280 验证与 960 训练</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>模型：YOLO26n full-label baseline</li><li>对比：640 训练模型在 640/960/1280 下验证，以及 imgsz=960 训练模型</li><li>指标：整体 mAP 与 small/medium/large AP</li><li>权重：full baseline best.pt 与 full train960 best.pt</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>先对 full-label 640 训练模型做 640、960、1280 多分辨率验证。</li><li>再补充 full-label imgsz=960 训练。</li><li>对 960 训练模型执行 area AP 统计并归档。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>baseline_full_640_val640</td><td>small</td><td>0.2982</td><td>0.1242</td><td>26586</td><td>118787</td></tr><tr><td>baseline_full_640_val640</td><td>medium</td><td>0.6483</td><td>0.4380</td><td>11105</td><td>37383</td></tr><tr><td>baseline_full_640_val640</td><td>large</td><td>0.7382</td><td>0.6134</td><td>1068</td><td>2222</td></tr><tr><td>baseline_full_640_val960</td><td>small</td><td>0.3834</td><td>0.1753</td><td>26586</td><td>124502</td></tr><tr><td>baseline_full_640_val960</td><td>medium</td><td>0.6631</td><td>0.4693</td><td>11105</td><td>32200</td></tr><tr><td>baseline_full_640_val960</td><td>large</td><td>0.7078</td><td>0.5885</td><td>1068</td><td>2445</td></tr><tr><td>baseline_full_640_val1280</td><td>small</td><td>0.4171</td><td>0.1971</td><td>26586</td><td>126759</td></tr><tr><td>baseline_full_640_val1280</td><td>medium</td><td>0.6590</td><td>0.4695</td><td>11105</td><td>31117</td></tr><tr><td>baseline_full_640_val1280</td><td>large</td><td>0.6122</td><td>0.4921</td><td>1068</td><td>2617</td></tr><tr><td>baseline_full_train960_val960</td><td>small</td><td>0.4057</td><td>0.1870</td><td>26586</td><td>122781</td></tr><tr><td>baseline_full_train960_val960</td><td>medium</td><td>0.7112</td><td>0.5040</td><td>11105</td><td>32898</td></tr><tr><td>baseline_full_train960_val960</td><td>large</td><td>0.7546</td><td>0.6358</td><td>1068</td><td>2580</td></tr></tbody></table></div>
 <p>补充 10% 标签主对照：<code>baseline_10pct_960</code> 已完成 120 epoch，best epoch=110，best mAP50=0.2572、best mAP50-95=0.1444。该结果后续作为 960 分辨率下 objectness 预训练/联合训练的主要对照，详见第 5 节。</p>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>full train960 的整体 mAP50-95=0.2424，显著高于 full train640 的 0.1762。</li>
-<li>小目标 AP 随验证分辨率升高明显改善，说明 VisDrone 的低 mAP50 与小目标尺度强相关。</li>
-<li>1280 验证提升 small AP，但 large AP 下滑，后续部署需要在小目标收益和整体稳定性之间折中。</li>
-<li>10% 标签在 960 下的 mAP50-95=0.144，高于 10%/640 baseline 的 0.1007，说明少标签场景同样显著受益于更高输入分辨率。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">05</span> 10% 标签 baseline：imgsz=960 主对照</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>模型：YOLO26n</li>
-<li>数据：VisDrone train 10% 标签子集，val 使用完整验证集</li>
-<li>训练输入：960</li>
-<li>epoch：120</li>
-<li>batch：16</li>
-<li>优化器：Ultralytics auto AdamW</li>
-<li>输出目录：<code>runs/baselines/yolo26n_visdrone_10pct_imgsz960</code></li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 使用 <code>configs/datasets/visdrone_10pct.yaml</code> 作为训练集配置，保持与 10%/640 baseline 相同的数据划分。</li>
-<li>2. 将训练和验证输入分辨率从 640 提升到 960，其他训练轮数、seed、优化器策略保持一致。</li>
-<li>3. 训练完成后读取 <code>results.csv</code>，按 best mAP50-95 选择最佳 epoch。</li>
-<li>4. 同步非权重产物到本地，包括 <code>results.csv</code>、<code>args.yaml</code>、<code>results.png</code>、PR/F1 曲线和可视化 batch 图；权重文件不下载到本地仓库。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>full train960 的整体 mAP50-95=0.2424，显著高于 full train640 的 0.1762。</li><li>小目标 AP 随验证分辨率升高明显改善，说明 VisDrone 的低 mAP50 与小目标尺度强相关。</li><li>1280 验证提升 small AP，但 large AP 下滑，后续部署需要在小目标收益和整体稳定性之间折中。</li><li>10% 标签在 960 下的 mAP50-95=0.144，高于 10%/640 baseline 的 0.1007，说明少标签场景同样显著受益于更高输入分辨率。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">05</span> 10% 标签 baseline：imgsz=960 主对照</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>模型：YOLO26n</li><li>数据：VisDrone train 10% 标签子集，val 使用完整验证集</li><li>训练输入：960</li><li>epoch：120</li><li>batch：16</li><li>优化器：Ultralytics auto AdamW</li><li>输出目录：<code>runs/baselines/yolo26n_visdrone_10pct_imgsz960</code></li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>使用 <code>configs/datasets/visdrone_10pct.yaml</code> 作为训练集配置，保持与 10%/640 baseline 相同的数据划分。</li><li>将训练和验证输入分辨率从 640 提升到 960，其他训练轮数、seed、优化器策略保持一致。</li><li>训练完成后读取 <code>results.csv</code>，按 best mAP50-95 选择最佳 epoch。</li><li>同步非权重产物到本地，包括 <code>results.csv</code>、<code>args.yaml</code>、<code>results.png</code>、PR/F1 曲线和可视化 batch 图；权重文件不下载到本地仓库。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.2542</td><td>0.1420</td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>类别</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th></tr></thead><tbody><tr><td>all</td><td>0.376</td><td>0.301</td><td>0.257</td><td>0.144</td></tr><tr><td>pedestrian</td><td>0.395</td><td>0.437</td><td>0.366</td><td>0.160</td></tr><tr><td>people</td><td>0.394</td><td>0.280</td><td>0.229</td><td>0.0801</td></tr><tr><td>bicycle</td><td>0.183</td><td>0.0847</td><td>0.0572</td><td>0.0242</td></tr><tr><td>car</td><td>0.618</td><td>0.726</td><td>0.704</td><td>0.464</td></tr><tr><td>van</td><td>0.369</td><td>0.326</td><td>0.266</td><td>0.179</td></tr><tr><td>truck</td><td>0.367</td><td>0.233</td><td>0.181</td><td>0.115</td></tr><tr><td>tricycle</td><td>0.297</td><td>0.183</td><td>0.124</td><td>0.0663</td></tr><tr><td>awning-tricycle</td><td>0.184</td><td>0.107</td><td>0.0664</td><td>0.0428</td></tr><tr><td>bus</td><td>0.488</td><td>0.307</td><td>0.277</td><td>0.193</td></tr><tr><td>motor</td><td>0.468</td><td>0.323</td><td>0.301</td><td>0.118</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>10% 标签从 640 提升到 960 后，mAP50-95 从 0.1007 提升到 0.1444，绝对提升 +0.0437；mAP50 从 0.1901 提升到 0.2572，绝对提升 +0.0671。</li>
-<li>该提升幅度明显大于当前 DINOv3 feature distillation 的边缘收益，进一步说明 VisDrone 少标签小目标检测首先受输入尺度限制。</li>
-<li>类别层面，<code>car</code> 的 mAP50=0.704、mAP50-95=0.464，显著高于其他类别；<code>bicycle</code>、<code>awning-tricycle</code>、<code>tricycle</code> 仍然较弱，说明高分辨率不能完全解决稀有/细粒度小目标问题。</li>
-<li>后续 objectness pretrain 或 tiled DINO 审计应以该实验作为 960 主对照，而不是继续只和 10%/640 baseline 比较。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">06</span> DINOv3 global feature distillation</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生：YOLO26n</li>
-<li>教师：DINOv3 ViT-B/16</li>
-<li>标签预算：10%</li>
-<li>输入：YOLO imgsz=640，teacher input=224</li>
-<li>蒸馏：全局 pooled feature / cosine loss，lambda=0.1</li>
-<li>epoch：120，batch=16</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 加载冻结 DINOv3 teacher。</li>
-<li>2. 捕获 YOLO 高层特征并映射到 teacher global embedding。</li>
-<li>3. 检测 loss 与 global feature distill loss 联合优化。</li>
-<li>4. 完成训练后与 10% baseline 对比。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>10% 标签从 640 提升到 960 后，mAP50-95 从 0.1007 提升到 0.1444，绝对提升 +0.0437；mAP50 从 0.1901 提升到 0.2572，绝对提升 +0.0671。</li><li>该提升幅度明显大于当前 DINOv3 feature distillation 的边缘收益，进一步说明 VisDrone 少标签小目标检测首先受输入尺度限制。</li><li>类别层面，<code>car</code> 的 mAP50=0.704、mAP50-95=0.464，显著高于其他类别；<code>bicycle</code>、<code>awning-tricycle</code>、<code>tricycle</code> 仍然较弱，说明高分辨率不能完全解决稀有/细粒度小目标问题。</li><li>后续 objectness pretrain 或 tiled DINO 审计应以该实验作为 960 主对照，而不是继续只和 10%/640 baseline 比较。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">06</span> DINOv3 global feature distillation</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>学生：YOLO26n</li><li>教师：DINOv3 ViT-B/16</li><li>标签预算：10%</li><li>输入：YOLO imgsz=640，teacher input=224</li><li>蒸馏：全局 pooled feature / cosine loss，lambda=0.1</li><li>epoch：120，batch=16</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>加载冻结 DINOv3 teacher。</li><li>捕获 YOLO 高层特征并映射到 teacher global embedding。</li><li>检测 loss 与 global feature distill loss 联合优化。</li><li>完成训练后与 10% baseline 对比。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>dinov3_global_10pct_640</td><td>81</td><td>0.3052</td><td>0.2374</td><td>0.1885</td><td>0.1015</td><td>0.1830</td><td>0.0973</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>global 蒸馏 mAP50-95=0.1015，相对 baseline 变化 +0.0008。</li>
-<li>mAP50 低于 baseline，mAP50-95 略高，整体收益很小。</li>
-<li>全局语义特征对密集小目标检测不够精细，不能直接提供定位友好的监督。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">07</span> DINOv3 全图 patch-token distillation：batch=16 partial 与 batch=32</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生：YOLO26n</li>
-<li>教师：DINOv3 ViT-B/16</li>
-<li>标签预算：10%</li>
-<li>teacher input=224，patch grid=14x14</li>
-<li>蒸馏：全图 patch-token cosine loss，lambda=0.05</li>
-<li>batch=16 版本提前停止在 47 epoch；batch=32 完成 120 epoch</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 先运行 batch=16 patch 蒸馏，观察 GPU 利用率和早期指标。</li>
-<li>2. 发现 GPU 利用率偏低后改为 batch=32。</li>
-<li>3. batch=32 完成训练后执行 standard val、small/medium/large AP、checkpoint clean 验证。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>global 蒸馏 mAP50-95=0.1015，相对 baseline 变化 +0.0008。</li><li>mAP50 低于 baseline，mAP50-95 略高，整体收益很小。</li><li>全局语义特征对密集小目标检测不够精细，不能直接提供定位友好的监督。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">07</span> DINOv3 全图 patch-token distillation：batch=16 partial 与 batch=32</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>学生：YOLO26n</li><li>教师：DINOv3 ViT-B/16</li><li>标签预算：10%</li><li>teacher input=224，patch grid=14x14</li><li>蒸馏：全图 patch-token cosine loss，lambda=0.05</li><li>batch=16 版本提前停止在 47 epoch；batch=32 完成 120 epoch</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>先运行 batch=16 patch 蒸馏，观察 GPU 利用率和早期指标。</li><li>发现 GPU 利用率偏低后改为 batch=32。</li><li>batch=32 完成训练后执行 standard val、small/medium/large AP、checkpoint clean 验证。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>dinov3_patch_b16_partial</td><td>45</td><td>0.2763</td><td>0.2412</td><td>0.1762</td><td>0.0920</td><td>0.1725</td><td>0.0901</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>99</td><td>0.3135</td><td>0.2449</td><td>0.1924</td><td>0.1004</td><td>0.1850</td><td>0.0973</td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>small</td><td>0.1754</td><td>0.0640</td><td>26586</td><td>114472</td></tr><tr><td>baseline_10pct_640</td><td>medium</td><td>0.5127</td><td>0.3283</td><td>11105</td><td>42984</td></tr><tr><td>baseline_10pct_640</td><td>large</td><td>0.6004</td><td>0.4714</td><td>1068</td><td>2565</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>small</td><td>0.1752</td><td>0.0631</td><td>26586</td><td>114831</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>medium</td><td>0.5176</td><td>0.3293</td><td>11105</td><td>42250</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>large</td><td>0.5949</td><td>0.4671</td><td>1068</td><td>2565</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>small</td><td>0.1794</td><td>0.0659</td><td>26586</td><td>116965</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>medium</td><td>0.5168</td><td>0.3295</td><td>11105</td><td>40762</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>large</td><td>0.6095</td><td>0.4755</td><td>1068</td><td>2573</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>patch b32 的 mAP50=0.1924 略高于 baseline，但 mAP50-95=0.1004 低于 baseline。</li>
-<li>small AP50-95 从 baseline 0.0640 降到 patch b32 0.0631，说明全图 patch 对齐没有改善小目标。</li>
-<li>主要问题是背景 token 占比高，小目标区域信号被稀释；此外原始 patch b32 checkpoint 携带 hook pickle 引用，后续以 best_clean.pt 作为可加载权重。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">08</span> DINOv3 region-aware patch distillation</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生：YOLO26n</li>
-<li>教师：DINOv3 ViT-B/16</li>
-<li>标签预算：10%</li>
-<li>YOLO imgsz=640，teacher input=448，patch grid=28x28</li>
-<li>学生层：YOLO layer 16</li>
-<li>蒸馏：仅在 GT box 扩张区域计算 patch-token cosine loss</li>
-<li>lambda_region=0.05，box_expand_tokens=1，batch=16，epoch=120</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 先做 1 epoch smoke test，确认训练、验证和权重保存流程。</li>
-<li>2. 验证 best.pt 可被普通 YOLO 直接加载，避免 patch b32 的 hook pickle 问题。</li>
-<li>3. 启动正式 120 epoch 训练。</li>
-<li>4. 训练完成后执行 small/medium/large AP 统计并更新主报告。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>patch b32 的 mAP50=0.1924 略高于 baseline，但 mAP50-95=0.1004 低于 baseline。</li><li>small AP50-95 从 baseline 0.0640 降到 patch b32 0.0631，说明全图 patch 对齐没有改善小目标。</li><li>主要问题是背景 token 占比高，小目标区域信号被稀释；此外原始 patch b32 checkpoint 携带 hook pickle 引用，后续以 best_clean.pt 作为可加载权重。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">08</span> DINOv3 region-aware patch distillation</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>学生：YOLO26n</li><li>教师：DINOv3 ViT-B/16</li><li>标签预算：10%</li><li>YOLO imgsz=640，teacher input=448，patch grid=28x28</li><li>学生层：YOLO layer 16</li><li>蒸馏：仅在 GT box 扩张区域计算 patch-token cosine loss</li><li>lambda_region=0.05，box_expand_tokens=1，batch=16，epoch=120</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>先做 1 epoch smoke test，确认训练、验证和权重保存流程。</li><li>验证 best.pt 可被普通 YOLO 直接加载，避免 patch b32 的 hook pickle 问题。</li><li>启动正式 120 epoch 训练。</li><li>训练完成后执行 small/medium/large AP 统计并更新主报告。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>99</td><td>0.3105</td><td>0.2392</td><td>0.1901</td><td>0.1007</td><td>0.1808</td><td>0.0942</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>99</td><td>0.3135</td><td>0.2449</td><td>0.1924</td><td>0.1004</td><td>0.1850</td><td>0.0973</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>107</td><td>0.3050</td><td>0.2458</td><td>0.1920</td><td>0.1018</td><td>0.1865</td><td>0.0982</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>85</td><td>0.3703</td><td>0.3024</td><td>0.2614</td><td>0.1455</td><td>0.2557</td><td>0.1420</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>81</td><td>0.3692</td><td>0.2995</td><td>0.2588</td><td>0.1442</td><td>0.2535</td><td>0.1400</td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>baseline_10pct_640</td><td>small</td><td>0.1754</td><td>0.0640</td><td>26586</td><td>114472</td></tr><tr><td>baseline_10pct_640</td><td>medium</td><td>0.5127</td><td>0.3283</td><td>11105</td><td>42984</td></tr><tr><td>baseline_10pct_640</td><td>large</td><td>0.6004</td><td>0.4714</td><td>1068</td><td>2565</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>small</td><td>0.1752</td><td>0.0631</td><td>26586</td><td>114831</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>medium</td><td>0.5176</td><td>0.3293</td><td>11105</td><td>42250</td></tr><tr><td>dinov3_patch_b32_10pct_640</td><td>large</td><td>0.5949</td><td>0.4671</td><td>1068</td><td>2565</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>small</td><td>0.1794</td><td>0.0659</td><td>26586</td><td>116965</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>medium</td><td>0.5168</td><td>0.3295</td><td>11105</td><td>40762</td></tr><tr><td>dinov3_region_patch_10pct_640</td><td>large</td><td>0.6095</td><td>0.4755</td><td>1068</td><td>2573</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>region-aware mAP50-95=0.1018，相对 baseline 变化 +0.0011。</li>
-<li>small AP50-95=0.0659，相对 baseline 变化 +0.0019。</li>
-<li>这是当前 DINOv3 系列中最好的设置，说明区域化蒸馏方向优于全图 patch 蒸馏。</li>
-<li>但提升仍是边缘级别；日志尾部的 ConnectionResetError 出现在训练完成后的 dataloader 收尾阶段，权重和 results.csv 已完整落盘。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">09</span> DINOv3 类别无关 objectness 审计：第一轮</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>目的：验证 DINOv3 是否能在无标注 VisDrone 图像中提供“哪里像物体”的类别无关 objectness 信号。</li>
-<li>数据：从 VisDrone train 随机抽样 300 张图像，seed=42。</li>
-<li>教师：DINOv3 ViT-B/16，冻结权重。</li>
-<li>输入：每张图 resize 到 448，patch size=16，得到 28x28 patch token。</li>
-<li>方法：<code>border_contrast + PCA foregroundness</code> 融合。GT 框只用于离线评估覆盖率，不参与生成 objectness map。</li>
-<li>输出：<code>runs/dinov3_objectness/audit_train300_448/objectness_summary.csv</code>、<code>objectness_metrics.csv</code> 和 24 张 overlay。</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 对每张图提取 DINOv3 patch tokens。</li>
-<li>2. 用图像边缘 patch 估计背景 token，计算每个 patch 与背景均值的 cosine 差异。</li>
-<li>3. 对 patch tokens 做 PCA，用第一主成分估计前景/背景分离方向，并用边缘区域校正方向。</li>
-<li>4. 将 border contrast 与 PCA foregroundness 归一化后平均，得到 28x28 objectness map。</li>
-<li>5. 把 GT box 投影到 28x28 patch grid，仅用于统计 top10/top20 高响应区域是否覆盖真实目标。</li>
-<li>6. 生成高响应红黄高亮 overlay，用人工观察判断高响应区域是否真正在物体上。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>region-aware mAP50-95=0.1018，相对 baseline 变化 +0.0011。</li><li>small AP50-95=0.0659，相对 baseline 变化 +0.0019。</li><li>这是当前 DINOv3 系列中最好的设置，说明区域化蒸馏方向优于全图 patch 蒸馏。</li><li>但提升仍是边缘级别；日志尾部的 ConnectionResetError 出现在训练完成后的 dataloader 收尾阶段，权重和 results.csv 已完整落盘。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">09</span> DINOv3 类别无关 objectness 审计：第一轮</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>目的：验证 DINOv3 是否能在无标注 VisDrone 图像中提供“哪里像物体”的类别无关 objectness 信号。</li><li>数据：从 VisDrone train 随机抽样 300 张图像，seed=42。</li><li>教师：DINOv3 ViT-B/16，冻结权重。</li><li>输入：每张图 resize 到 448，patch size=16，得到 28x28 patch token。</li><li>方法：<code>border_contrast + PCA foregroundness</code> 融合。GT 框只用于离线评估覆盖率，不参与生成 objectness map。</li><li>输出：<code>runs/dinov3_objectness/audit_train300_448/objectness_summary.csv</code>、<code>objectness_metrics.csv</code> 和 24 张 overlay。</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>对每张图提取 DINOv3 patch tokens。</li><li>用图像边缘 patch 估计背景 token，计算每个 patch 与背景均值的 cosine 差异。</li><li>对 patch tokens 做 PCA，用第一主成分估计前景/背景分离方向，并用边缘区域校正方向。</li><li>将 border contrast 与 PCA foregroundness 归一化后平均，得到 28x28 objectness map。</li><li>把 GT box 投影到 28x28 patch grid，仅用于统计 top10/top20 高响应区域是否覆盖真实目标。</li><li>生成高响应红黄高亮 overlay，用人工观察判断高响应区域是否真正在物体上。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>指标</th><th>数值</th></tr></thead><tbody><tr><td>images</td><td>300</td></tr><tr><td>boxes</td><td>16909</td></tr><tr><td>small_boxes</td><td>10204</td></tr><tr><td>top10_box_recall</td><td>0.1855</td></tr><tr><td>top20_box_recall</td><td>0.3330</td></tr><tr><td>small_top10_recall</td><td>0.1643</td></tr><tr><td>small_top20_recall</td><td>0.3023</td></tr><tr><td>mean_foreground_score</td><td>0.6042</td></tr><tr><td>mean_background_score</td><td>0.4942</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>数值上，GT 区域平均分 0.6042，高于背景区域 0.4942，说明 DINOv3 patch token 中确实存在一定前景/背景差异。</li>
-<li>但 overlay 显示，高响应区域主要覆盖道路、中心透视区域或大块场景结构，而不是稳定突出小车、行人等实例目标。</li>
-<li>small top20 recall=0.3023 的含义需要谨慎解释：很多小目标位于道路区域内，因此被道路显著性“间接覆盖”，不代表 DINO objectness 已经准确定位小目标实例。</li>
-<li>该轮审计结论是负向但有价值：全图级 <code>border_contrast + PCA</code> 更像 scene/layout saliency，不适合作为后续 YOLO objectness pretrain 的直接监督信号。</li>
-<li>下一步应转向局部实例显著性信号，包括 local contrast、local residual 以及后续 tiled DINO 审计。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">10</span> DINOv3 类别无关 objectness 审计：第二轮局部方法</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>目的：针对第一轮高亮道路/场景结构的问题，改用局部邻域差异来估计实例级 objectness。</li>
-<li>数据：与第一轮一致，VisDrone train 随机抽样 300 张，seed=42。</li>
-<li>教师：DINOv3 ViT-B/16，输入 448，patch grid=28x28。</li>
-<li>方法：<code>local_contrast</code>、<code>local_residual</code>、<code>local_fusion</code>。</li>
-<li>输出目录：<code>runs/dinov3_objectness/audit_train300_448_local_contrast</code>、<code>audit_train300_448_local_residual</code>、<code>audit_train300_448_local_fusion</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. <code>local_contrast</code>：对每个 DINO patch token 与 3x3 邻域平均 token 做 cosine 差异，高分表示局部语义突变。</li>
-<li>2. <code>local_residual</code>：对原始 token feature 做 5x5 局部平滑，取残差强度，高分表示局部高频结构。</li>
-<li>3. <code>local_fusion</code>：将 <code>local_contrast</code> 与 <code>local_residual</code> 归一化后平均。</li>
-<li>4. 对三种方法分别统计 top10/top20 box recall 和 small object recall，并生成 24 张 overlay。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>数值上，GT 区域平均分 0.6042，高于背景区域 0.4942，说明 DINOv3 patch token 中确实存在一定前景/背景差异。</li><li>但 overlay 显示，高响应区域主要覆盖道路、中心透视区域或大块场景结构，而不是稳定突出小车、行人等实例目标。</li><li>small top20 recall=0.3023 的含义需要谨慎解释：很多小目标位于道路区域内，因此被道路显著性“间接覆盖”，不代表 DINO objectness 已经准确定位小目标实例。</li><li>该轮审计结论是负向但有价值：全图级 <code>border_contrast + PCA</code> 更像 scene/layout saliency，不适合作为后续 YOLO objectness pretrain 的直接监督信号。</li><li>下一步应转向局部实例显著性信号，包括 local contrast、local residual 以及后续 tiled DINO 审计。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">10</span> DINOv3 类别无关 objectness 审计：第二轮局部方法</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>目的：针对第一轮高亮道路/场景结构的问题，改用局部邻域差异来估计实例级 objectness。</li><li>数据：与第一轮一致，VisDrone train 随机抽样 300 张，seed=42。</li><li>教师：DINOv3 ViT-B/16，输入 448，patch grid=28x28。</li><li>方法：<code>local_contrast</code>、<code>local_residual</code>、<code>local_fusion</code>。</li><li>输出目录：<code>runs/dinov3_objectness/audit_train300_448_local_contrast</code>、<code>audit_train300_448_local_residual</code>、<code>audit_train300_448_local_fusion</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li><code>local_contrast</code>：对每个 DINO patch token 与 3x3 邻域平均 token 做 cosine 差异，高分表示局部语义突变。</li><li><code>local_residual</code>：对原始 token feature 做 5x5 局部平滑，取残差强度，高分表示局部高频结构。</li><li><code>local_fusion</code>：将 <code>local_contrast</code> 与 <code>local_residual</code> 归一化后平均。</li><li>对三种方法分别统计 top10/top20 box recall 和 small object recall，并生成 24 张 overlay。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>方法</th><th>top10_box_recall</th><th>top20_box_recall</th><th>small_top10_recall</th><th>small_top20_recall</th><th>foreground_score</th><th>background_score</th></tr></thead><tbody><tr><td>border_pca_first_round</td><td>0.1855</td><td>0.3330</td><td>0.1643</td><td>0.3023</td><td>0.6042</td><td>0.4942</td></tr><tr><td>local_contrast</td><td>0.4706</td><td>0.6530</td><td>0.3141</td><td>0.5112</td><td>0.2919</td><td>0.1662</td></tr><tr><td>local_residual</td><td>0.4295</td><td>0.6220</td><td>0.2768</td><td>0.4822</td><td>0.4681</td><td>0.3256</td></tr><tr><td>local_fusion</td><td>0.4579</td><td>0.6463</td><td>0.3033</td><td>0.5066</td><td>0.3855</td><td>0.2478</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>局部方法显著提高 GT box 覆盖率：<code>local_contrast</code> 的 top20_box_recall=0.6530，高于第一轮 0.3330。</li>
-<li>小目标覆盖也明显提升：<code>local_contrast</code> 的 small_top20_recall=0.5112，高于第一轮 0.3023。</li>
-<li>可视化上，局部方法不再把整条道路均匀染黄，高响应更偏局部突起、车辆边缘、行人/车流密集位置，但仍存在只突出少数实例、对密集小目标响应不均匀的问题。</li>
-<li>当前最优候选是 <code>local_contrast</code>，它在整体 top10/top20 和 small top10/top20 四个覆盖率指标上均为最高。</li>
-<li>第二轮结果支持继续推进，但还不建议直接进入最终训练；下一步应做 tiled DINO 或 crop-level local contrast，验证小目标在更高局部尺度下是否能被更稳定地突出。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">11</span> DINOv3 类别无关 objectness 审计：第三轮 tiled local contrast</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>目的：验证切图后 DINOv3 是否能更稳定地看到 VisDrone 小目标实例。</li>
-<li>数据：与前两轮一致，VisDrone train 随机抽样 300 张，seed=42。</li>
-<li>教师：DINOv3 ViT-B/16，teacher input=448。</li>
-<li>方法：<code>local_contrast</code>。</li>
-<li>切图：原图坐标下 <code>tile_size=480</code>，<code>tile_stride=240</code>，每个 tile resize 到 448 后提取 DINO patch tokens。</li>
-<li>合并：每个 tile 的 28x28 objectness map 插值回 tile 原始区域，重叠区域取平均，形成原图坐标下的 objectness map。</li>
-<li>输出目录：<code>runs/dinov3_objectness/audit_train300_448_tiled_local_contrast_t480_s240</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 对每张图按 480x480 窗口、240 stride 切图。</li>
-<li>2. 对每个 tile 运行 DINOv3，计算 3x3 邻域 <code>local_contrast</code>。</li>
-<li>3. 将 tile-level objectness 重新映射回原图坐标并融合。</li>
-<li>4. 用 GT box 只做离线覆盖率评估，不参与 objectness 生成。</li>
-<li>5. 生成 24 张 overlay，人工检查高响应区域是否更接近车辆/行人等实例目标。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>局部方法显著提高 GT box 覆盖率：<code>local_contrast</code> 的 top20_box_recall=0.6530，高于第一轮 0.3330。</li><li>小目标覆盖也明显提升：<code>local_contrast</code> 的 small_top20_recall=0.5112，高于第一轮 0.3023。</li><li>可视化上，局部方法不再把整条道路均匀染黄，高响应更偏局部突起、车辆边缘、行人/车流密集位置，但仍存在只突出少数实例、对密集小目标响应不均匀的问题。</li><li>当前最优候选是 <code>local_contrast</code>，它在整体 top10/top20 和 small top10/top20 四个覆盖率指标上均为最高。</li><li>第二轮结果支持继续推进，但还不建议直接进入最终训练；下一步应做 tiled DINO 或 crop-level local contrast，验证小目标在更高局部尺度下是否能被更稳定地突出。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">11</span> DINOv3 类别无关 objectness 审计：第三轮 tiled local contrast</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>目的：验证切图后 DINOv3 是否能更稳定地看到 VisDrone 小目标实例。</li><li>数据：与前两轮一致，VisDrone train 随机抽样 300 张，seed=42。</li><li>教师：DINOv3 ViT-B/16，teacher input=448。</li><li>方法：<code>local_contrast</code>。</li><li>切图：原图坐标下 <code>tile_size=480</code>，<code>tile_stride=240</code>，每个 tile resize 到 448 后提取 DINO patch tokens。</li><li>合并：每个 tile 的 28x28 objectness map 插值回 tile 原始区域，重叠区域取平均，形成原图坐标下的 objectness map。</li><li>输出目录：<code>runs/dinov3_objectness/audit_train300_448_tiled_local_contrast_t480_s240</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>对每张图按 480x480 窗口、240 stride 切图。</li><li>对每个 tile 运行 DINOv3，计算 3x3 邻域 <code>local_contrast</code>。</li><li>将 tile-level objectness 重新映射回原图坐标并融合。</li><li>用 GT box 只做离线覆盖率评估，不参与 objectness 生成。</li><li>生成 24 张 overlay，人工检查高响应区域是否更接近车辆/行人等实例目标。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>方法</th><th>tile_size</th><th>stride</th><th>top10_box_recall</th><th>top20_box_recall</th><th>small_top10_recall</th><th>small_top20_recall</th><th>foreground_score</th><th>background_score</th></tr></thead><tbody><tr><td>border_pca_first_round</td><td>N/A</td><td>N/A</td><td>0.1855</td><td>0.3330</td><td>0.1643</td><td>0.3023</td><td>0.6042</td><td>0.4942</td></tr><tr><td>local_contrast_full_image</td><td>N/A</td><td>N/A</td><td>0.4706</td><td>0.6530</td><td>0.3141</td><td>0.5112</td><td>0.2919</td><td>0.1662</td></tr><tr><td>tiled_local_contrast</td><td>480</td><td>240</td><td>0.7946</td><td>0.8964</td><td>0.6866</td><td>0.8352</td><td>0.3192</td><td>0.1742</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>tiled local contrast 显著提升 GT 覆盖率：top20_box_recall 从 full-image local_contrast 的 0.6530 提升到 0.8964。</li>
-<li>小目标覆盖提升更明显：small_top20_recall 从 0.5112 提升到 0.8352，说明切图确实缓解了整图 resize 下小目标过小的问题。</li>
-<li>可视化上，高响应不再整片覆盖道路，更多落在局部实例、目标边缘和交通参与者附近；这比第一轮全图显著性更接近“类别无关目标性”。</li>
-<li>仍需注意噪声：local contrast 也会响应灯杆、广告牌、斑马线、建筑边缘、施工结构等高频局部纹理。它适合作为 soft objectness 或候选区域信号，不适合直接当作硬伪框。</li>
-<li>该结果已经达到进入短程 objectness pretrain smoke 的条件，但训练时应使用软标签、低权重和强对照，避免学生学成“纹理/边缘检测器”。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">12</span> DINOv3 tiled objectness pretrain + 10%/960 fine-tune</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>目的：验证第三轮审计得到的 <code>tiled local_contrast</code> soft objectness map，是否能作为无标注预训练信号提升 10% 标签 YOLO26n 检测。</li>
-<li>学生：YOLO26n，部署期仍为 YOLO-only。</li>
-<li>无标注预训练数据：VisDrone full train 图像；GT 标签在 objectness map 生成中不参与，只由 Ultralytics dataloader 提供图像。</li>
-<li>objectness teacher：DINOv3 ViT-B/16，冻结权重，teacher input=448，patch grid=28x28。</li>
-<li>objectness 生成：原图按 <code>tile_size=480</code>、<code>tile_stride=240</code> 切图，每个 tile resize 到 448 后计算 DINO patch-token <code>local_contrast</code>，再插值回 YOLO layer 16 特征网格。</li>
-<li>学生监督位置：YOLO layer 16，student_dim=64，临时 <code>1x1 objectness head</code>；保存 checkpoint 前剥离该 head，因此 fine-tune 和部署权重仍是普通 YOLO 权重。</li>
-<li>预训练主设置：imgsz=960，epoch=20，batch=8，<code>lambda_objectness=1.0</code>，loss=BCE 与 Dice 的均值。</li>
-<li>微调设置：使用预训练 <code>last.pt</code> 初始化，<code>configs/datasets/visdrone_10pct.yaml</code>，imgsz=960，epoch=120，batch=16，seed=42，optimizer=auto，close_mosaic=10。</li>
-<li>输出目录：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objectness_pretrain</code> 与 <code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objectness_pretrain_ft</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 先运行 1 epoch smoke，确认 DINO teacher、YOLO hook、soft-map cache、临时 head 剥离和普通 YOLO 验证流程可用。</li>
-<li>2. 启动 full train 图像上的 objectness-only pretrain，训练过程中即时生成或读取 tiled local_contrast soft map cache。</li>
-<li>3. 预训练结束后检查 <code>weights/best.pt</code> 与 <code>weights/last.pt</code> 均可被普通 YOLO 加载。</li>
-<li>4. 使用预训练 <code>last.pt</code> 进行 10%/960 标注微调 120 epoch。</li>
-<li>5. 用 <code>results.csv</code> 按 best mAP50-95 选取最佳 epoch，并与 <code>baseline_10pct_960</code> 对比。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>tiled local contrast 显著提升 GT 覆盖率：top20_box_recall 从 full-image local_contrast 的 0.6530 提升到 0.8964。</li><li>小目标覆盖提升更明显：small_top20_recall 从 0.5112 提升到 0.8352，说明切图确实缓解了整图 resize 下小目标过小的问题。</li><li>可视化上，高响应不再整片覆盖道路，更多落在局部实例、目标边缘和交通参与者附近；这比第一轮全图显著性更接近“类别无关目标性”。</li><li>仍需注意噪声：local contrast 也会响应灯杆、广告牌、斑马线、建筑边缘、施工结构等高频局部纹理。它适合作为 soft objectness 或候选区域信号，不适合直接当作硬伪框。</li><li>该结果已经达到进入短程 objectness pretrain smoke 的条件，但训练时应使用软标签、低权重和强对照，避免学生学成“纹理/边缘检测器”。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">12</span> DINOv3 tiled objectness pretrain + 10%/960 fine-tune</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>目的：验证第三轮审计得到的 <code>tiled local_contrast</code> soft objectness map，是否能作为无标注预训练信号提升 10% 标签 YOLO26n 检测。</li><li>学生：YOLO26n，部署期仍为 YOLO-only。</li><li>无标注预训练数据：VisDrone full train 图像；GT 标签在 objectness map 生成中不参与，只由 Ultralytics dataloader 提供图像。</li><li>objectness teacher：DINOv3 ViT-B/16，冻结权重，teacher input=448，patch grid=28x28。</li><li>objectness 生成：原图按 <code>tile_size=480</code>、<code>tile_stride=240</code> 切图，每个 tile resize 到 448 后计算 DINO patch-token <code>local_contrast</code>，再插值回 YOLO layer 16 特征网格。</li><li>学生监督位置：YOLO layer 16，student_dim=64，临时 <code>1x1 objectness head</code>；保存 checkpoint 前剥离该 head，因此 fine-tune 和部署权重仍是普通 YOLO 权重。</li><li>预训练主设置：imgsz=960，epoch=20，batch=8，<code>lambda_objectness=1.0</code>，loss=BCE 与 Dice 的均值。</li><li>微调设置：使用预训练 <code>last.pt</code> 初始化，<code>configs/datasets/visdrone_10pct.yaml</code>，imgsz=960，epoch=120，batch=16，seed=42，optimizer=auto，close_mosaic=10。</li><li>输出目录：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objectness_pretrain</code> 与 <code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objectness_pretrain_ft</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>先运行 1 epoch smoke，确认 DINO teacher、YOLO hook、soft-map cache、临时 head 剥离和普通 YOLO 验证流程可用。</li><li>启动 full train 图像上的 objectness-only pretrain，训练过程中即时生成或读取 tiled local_contrast soft map cache。</li><li>预训练结束后检查 <code>weights/best.pt</code> 与 <code>weights/last.pt</code> 均可被普通 YOLO 加载。</li><li>使用预训练 <code>last.pt</code> 进行 10%/960 标注微调 120 epoch。</li><li>用 <code>results.csv</code> 按 best mAP50-95 选取最佳 epoch，并与 <code>baseline_10pct_960</code> 对比。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>pretrain lambda</th><th>pretrain epoch</th><th>fine-tune best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 10%/960 baseline</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>N/A</td><td>N/A</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.0000</td></tr><tr><td>objectness_lam100_ep20_ft</td><td>1.0</td><td>20</td><td>100</td><td>0.3587</td><td>0.2840</td><td>0.2366</td><td>0.1295</td><td>-0.0149</td></tr></tbody></table></div>
 <p>预训练最后一轮的 objectness 记录如下。注意：Ultralytics CSV 列名仍显示为 <code>train/box_loss</code>、<code>train/cls_loss</code>、<code>train/dfl_loss</code>，但在该自定义 trainer 中分别对应 <code>objectness_loss</code>、<code>objectness_bce</code>、<code>objectness_dice</code>。</p>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>epoch</th><th>objectness_loss</th><th>BCE</th><th>Dice</th><th>预训练耗时秒</th></tr></thead><tbody><tr><td>objectness_lam100_ep20</td><td>20</td><td>0.5275</td><td>0.3971</td><td>0.6580</td><td>1110.6</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>主实验 best mAP50-95=0.1295，低于 <code>baseline_10pct_960</code> 的 0.1444，绝对下降 -0.0149；mAP50 也从 0.2572 降到 0.2366。</li>
-<li>这说明 tiled local_contrast 虽然在审计阶段有较高 GT 覆盖率，但作为纯预训练密集监督时没有转化为检测收益。</li>
-<li>可能原因是 soft objectness map 仍包含道路边缘、斑马线、灯杆、广告牌、阴影等局部高频结构；YOLO 预训练学到的是“局部突变/纹理显著性”，而不是检测任务需要的类别可分、框可回归特征。</li>
-<li>纯 objectness pretrain 不包含 box/class/dfl 检测目标，可能改变了 layer 16 小目标检测特征的分布，导致后续 10% 标注微调无法完全拉回。</li>
-<li>日志中的 <code>ConnectionResetError</code> 出现在预训练结束后的 dataloader/pin_memory 收尾阶段；之后 fine-tune 正常启动并完整落盘，因此不作为训练失败处理。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现信息</h3>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>主实验 best mAP50-95=0.1295，低于 <code>baseline_10pct_960</code> 的 0.1444，绝对下降 -0.0149；mAP50 也从 0.2572 降到 0.2366。</li><li>这说明 tiled local_contrast 虽然在审计阶段有较高 GT 覆盖率，但作为纯预训练密集监督时没有转化为检测收益。</li><li>可能原因是 soft objectness map 仍包含道路边缘、斑马线、灯杆、广告牌、阴影等局部高频结构；YOLO 预训练学到的是“局部突变/纹理显著性”，而不是检测任务需要的类别可分、框可回归特征。</li><li>纯 objectness pretrain 不包含 box/class/dfl 检测目标，可能改变了 layer 16 小目标检测特征的分布，导致后续 10% 标注微调无法完全拉回。</li><li>日志中的 <code>ConnectionResetError</code> 出现在预训练结束后的 dataloader/pin_memory 收尾阶段；之后 fine-tune 正常启动并完整落盘，因此不作为训练失败处理。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现信息</h3>
 <div class="table-wrap"><table><thead><tr><th>项目</th><th>路径 / 命令</th></tr></thead><tbody><tr><td>主训练脚本</td><td><code>scripts/train_dinov3_objectness_pretrain.py</code></td></tr><tr><td>主实验配置</td><td><code>configs/experiments/dinov3_objectness_pretrain_visdrone_full_imgsz960.yaml</code></td></tr><tr><td>soft map cache</td><td><code>/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960</code></td></tr><tr><td>训练队列日志</td><td><code>runs/dinov3_objectness/logs/yolo26n_objectness_pretrain_ft_10pct960.log</code></td></tr><tr><td>结构化汇总</td><td><code>runs/reports/tables/objectness_pretrain_ablation_summary.csv</code>、<code>runs/reports/tables/objectness_reproducibility_index.csv</code></td></tr></tbody></table></div>
 <p>主实验复现命令：</p>
-<pre><code>python scripts/train_dinov3_objectness_pretrain.py \
+<pre><code class="language-bash">python scripts/train_dinov3_objectness_pretrain.py \
   --config configs/experiments/dinov3_objectness_pretrain_visdrone_full_imgsz960.yaml \
   --name yolo26n_visdrone_full_imgsz960_dinov3_objectness_pretrain
 
@@ -347,177 +146,104 @@ yolo detect train \
   project=/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness \
   name=yolo26n_visdrone_10pct_imgsz960_dinov3_objectness_pretrain_ft \
   exist_ok=True optimizer=auto patience=100 close_mosaic=10 amp=True plots=True</code></pre>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">13</span> Objectness 预训练定位消融：lambda 与预训练时长</div><div class="section-body"><div class="sub-section"><h3>配置</h3>
+<ul><li>目的：定位第 12 节负迁移是否主要来自 objectness 约束过强或预训练过久。</li><li>固定项：YOLO26n、VisDrone full train objectness pretrain、DINOv3 ViT-B/16、teacher input=448、<code>local_contrast</code>、<code>tile_size=480</code>、<code>tile_stride=240</code>、student layer 16、imgsz=960、pretrain batch=8、fine-tune 数据与第 12 节相同。</li><li>变量：<code>lambda_objectness</code> 与预训练 epoch。</li><li>三组设置：<code>lam010_ep5</code>、<code>lam010_ep10</code>、<code>lam025_ep5</code>。</li><li>队列日志：<code>runs/dinov3_objectness/logs/objectness_ablation_queue.log</code>。</li></ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">13</span> Objectness 预训练定位消融：lambda 与预训练时长</div>
-<div class="section-body">
-<div class="sub-section"><h3>配置</h3>
-<ul>
-<li>目的：定位第 12 节负迁移是否主要来自 objectness 约束过强或预训练过久。</li>
-<li>固定项：YOLO26n、VisDrone full train objectness pretrain、DINOv3 ViT-B/16、teacher input=448、<code>local_contrast</code>、<code>tile_size=480</code>、<code>tile_stride=240</code>、student layer 16、imgsz=960、pretrain batch=8、fine-tune 数据与第 12 节相同。</li>
-<li>变量：<code>lambda_objectness</code> 与预训练 epoch。</li>
-<li>三组设置：<code>lam010_ep5</code>、<code>lam010_ep10</code>、<code>lam025_ep5</code>。</li>
-<li>队列日志：<code>runs/dinov3_objectness/logs/objectness_ablation_queue.log</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>步骤</h3>
-<ol>
-<li>1. 复用第 12 节已经生成的 tiled local_contrast soft-map cache，避免重新计算 teacher map 造成额外变量。</li>
-<li>2. 依次运行三组 objectness pretrain，每组完成后立即使用其 <code>last.pt</code> 做 10%/960 fine-tune。</li>
-<li>3. 每组 fine-tune 均使用相同的 120 epoch、batch=16、seed=42、optimizer=auto、close_mosaic=10。</li>
-<li>4. 训练完成后从各自 <code>results.csv</code> 中抽取 best mAP50-95、last mAP50-95 与预训练最后一轮 objectness loss。</li>
-<li>5. 与 <code>baseline_10pct_960</code> 和第 12 节 <code>lambda=1.0, ep20</code> 主实验做对比。</li>
-</ol>
-</div><div class="sub-section"><h3>结果</h3>
+<div class="sub-section"><h3>步骤</h3>
+<ol><li>复用第 12 节已经生成的 tiled local_contrast soft-map cache，避免重新计算 teacher map 造成额外变量。</li><li>依次运行三组 objectness pretrain，每组完成后立即使用其 <code>last.pt</code> 做 10%/960 fine-tune。</li><li>每组 fine-tune 均使用相同的 120 epoch、batch=16、seed=42、optimizer=auto、close_mosaic=10。</li><li>训练完成后从各自 <code>results.csv</code> 中抽取 best mAP50-95、last mAP50-95 与预训练最后一轮 objectness loss。</li><li>与 <code>baseline_10pct_960</code> 和第 12 节 <code>lambda=1.0, ep20</code> 主实验做对比。</li></ol>
+</div>
+<div class="sub-section"><h3>结果</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>lambda</th><th>pretrain epoch</th><th>pretrain objectness_loss</th><th>pretrain BCE</th><th>pretrain Dice</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 baseline</th><th>相对 lam100_ep20</th></tr></thead><tbody><tr><td>lam010_ep5</td><td>0.1</td><td>5</td><td>0.0535</td><td>0.4015</td><td>0.6679</td><td>100</td><td>0.3537</td><td>0.2904</td><td>0.2415</td><td>0.1329</td><td>-0.0115</td><td>0.0034</td></tr><tr><td>lam010_ep10</td><td>0.1</td><td>10</td><td>0.0530</td><td>0.3984</td><td>0.6613</td><td>107</td><td>0.3545</td><td>0.2824</td><td>0.2371</td><td>0.1295</td><td>-0.0149</td><td>0.0000</td></tr><tr><td>lam025_ep5</td><td>0.25</td><td>5</td><td>0.1337</td><td>0.4015</td><td>0.6678</td><td>110</td><td>0.3423</td><td>0.2973</td><td>0.2425</td><td>0.1338</td><td>-0.0106</td><td>0.0043</td></tr></tbody></table></div>
 <p>权重路径：</p>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>best.pt</th></tr></thead><tbody><tr><td>lam010_ep5</td><td><code>/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objpre_lam010_ep5_ft/weights/best.pt</code></td></tr><tr><td>lam010_ep10</td><td><code>/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objpre_lam010_ep10_ft/weights/best.pt</code></td></tr><tr><td>lam025_ep5</td><td><code>/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objpre_lam025_ep5_ft/weights/best.pt</code></td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>最好的消融是 <code>lam025_ep5</code>，best mAP50-95=0.1338；其次是 <code>lam010_ep5</code>，best mAP50-95=0.1329。二者均高于第 12 节 <code>lambda=1.0, ep20</code> 的 0.1295，但仍低于 <code>baseline_10pct_960</code> 的 0.1444。</li>
-<li><code>lam010_ep10</code> 退回到 0.1295，几乎等同主实验，说明即使低权重，预训练时间加长也没有带来正收益。</li>
-<li>降低权重和缩短预训练只能缓解一小部分负迁移，不能消除负迁移；因此问题不只是“约束过强/过久”，更可能是纯 objectness pretrain 目标本身与 YOLO 检测目标不对齐。</li>
-<li>预训练阶段 objectness loss 能下降，但 fine-tune mAP 没有超过 baseline，说明“拟合 DINO objectness map”不是检测性能提升的充分条件。</li>
-<li>当前证据支持放弃继续扩展纯 objectness pretrain，转向检测 loss 主导的联合训练式弱辅助，或者只在高置信 top-k 区域做 ignore-aware 辅助，而不是对整图密集回归 objectness map。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现信息</h3>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>最好的消融是 <code>lam025_ep5</code>，best mAP50-95=0.1338；其次是 <code>lam010_ep5</code>，best mAP50-95=0.1329。二者均高于第 12 节 <code>lambda=1.0, ep20</code> 的 0.1295，但仍低于 <code>baseline_10pct_960</code> 的 0.1444。</li><li><code>lam010_ep10</code> 退回到 0.1295，几乎等同主实验，说明即使低权重，预训练时间加长也没有带来正收益。</li><li>降低权重和缩短预训练只能缓解一小部分负迁移，不能消除负迁移；因此问题不只是“约束过强/过久”，更可能是纯 objectness pretrain 目标本身与 YOLO 检测目标不对齐。</li><li>预训练阶段 objectness loss 能下降，但 fine-tune mAP 没有超过 baseline，说明“拟合 DINO objectness map”不是检测性能提升的充分条件。</li><li>当前证据支持放弃继续扩展纯 objectness pretrain，转向检测 loss 主导的联合训练式弱辅助，或者只在高置信 top-k 区域做 ignore-aware 辅助，而不是对整图密集回归 objectness map。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现信息</h3>
 <p>消融配置均已同步到 <code>configs/experiments/</code>，队列顺序为：<code>lam010_ep5 -&gt; lam010_ep10 -&gt; lam025_ep5</code>。每组预训练命令形如：</p>
-<pre><code>python scripts/train_dinov3_objectness_pretrain.py \
+<pre><code class="language-bash">python scripts/train_dinov3_objectness_pretrain.py \
   --config configs/experiments/dinov3_objectness_pretrain_visdrone_full_imgsz960_lam010_ep5.yaml \
   --name yolo26n_visdrone_full_imgsz960_dinov3_objpre_lam010_ep5</code></pre>
 <p>每组 fine-tune 命令形如：</p>
-<pre><code>yolo detect train \
+<pre><code class="language-bash">yolo detect train \
   model=runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objpre_lam010_ep5/weights/last.pt \
   data=configs/datasets/visdrone_10pct.yaml \
   imgsz=960 epochs=120 batch=16 device=0 workers=8 seed=42 \
   project=/home/featurize/vfm-yolo-distillation/runs/dinov3_objectness \
   name=yolo26n_visdrone_10pct_imgsz960_dinov3_objpre_lam010_ep5_ft \
   exist_ok=True optimizer=auto patience=100 close_mosaic=10 amp=True plots=True</code></pre>
-</div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">14</span> DINOv3 relation distillation：10%/960</div>
-<div class="section-body">
-<div class="sub-section"><h3>实验目的</h3>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">14</span> DINOv3 relation distillation：10%/960</div><div class="section-body"><div class="sub-section"><h3>实验目的</h3>
 <p>前几轮 global、patch 与 region-aware patch 蒸馏主要约束单点特征或区域特征，收益较弱。relation distillation 改为约束 patch token 之间的相似度结构：不要求 YOLO 学生逐点复刻 DINOv3 的特征值，而是让学生特征在局部 token 之间形成与 DINOv3 老师相近的关系矩阵。该实验用于验证“让学生学习 DINO 如何组织视觉区域关系”是否比直接特征模仿更适合少标签 VisDrone 检测。</p>
-</div><div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生模型：<code>YOLO26n</code>，部署阶段仍为 YOLO-only。</li>
-<li>训练数据：<code>configs/datasets/visdrone_10pct.yaml</code>，VisDrone train 10% 标注子集，验证使用完整 val。</li>
-<li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li>
-<li>DINOv3 老师：<code>dinov3_vitb16</code>，权重 <code>/home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth</code>。</li>
-<li>特征对齐：老师输入 <code>448</code>，patch grid <code>28x28</code>，teacher dim <code>768</code>；学生取 YOLO layer <code>16</code>，student dim <code>64</code>，经 <code>1x1 Conv</code> 投影到 768 维。</li>
-<li>关系蒸馏：每 batch 从 token 中采样最多 <code>256</code> 个 token，计算学生/老师 token 的归一化关系矩阵并做 MSE；损失权重 <code>lambda_relation=0.05</code>。</li>
-<li>配置文件：<code>configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现步骤</h3>
-<ol>
-<li>1. 在本地实现 <code>src/vfm_yolo_distillation/relation_distillation.py</code> 与 <code>scripts/train_dinov3_relation_distill.py</code>，并提交到 GitHub。</li>
-<li>2. 远程服务器拉取对应提交；由于远程 GitHub TLS 拉取异常，实际使用本地 git bundle 同步到服务器，远程仓库最终位于提交 <code>f695ad6</code>。</li>
-<li>3. 修复远程运行环境：安装 <code>opencv-python-headless==4.11.0.86</code>，创建 <code>/home/featurize/datasets/visdrone -&gt; /home/featurize/visdrone</code> 数据软链，并执行 <code>scripts/prepare_visdrone.py</code> 生成 10% split。</li>
-<li>4. 启动训练命令：</li>
-</ol>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+</div>
+<div class="sub-section"><h3>配置</h3>
+<ul><li>学生模型：<code>YOLO26n</code>，部署阶段仍为 YOLO-only。</li><li>训练数据：<code>configs/datasets/visdrone_10pct.yaml</code>，VisDrone train 10% 标注子集，验证使用完整 val。</li><li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li><li>DINOv3 老师：<code>dinov3_vitb16</code>，权重 <code>/home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth</code>。</li><li>特征对齐：老师输入 <code>448</code>，patch grid <code>28x28</code>，teacher dim <code>768</code>；学生取 YOLO layer <code>16</code>，student dim <code>64</code>，经 <code>1x1 Conv</code> 投影到 768 维。</li><li>关系蒸馏：每 batch 从 token 中采样最多 <code>256</code> 个 token，计算学生/老师 token 的归一化关系矩阵并做 MSE；损失权重 <code>lambda_relation=0.05</code>。</li><li>配置文件：<code>configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现步骤</h3>
+<ol><li>在本地实现 <code>src/vfm_yolo_distillation/relation_distillation.py</code> 与 <code>scripts/train_dinov3_relation_distill.py</code>，并提交到 GitHub。</li><li>远程服务器拉取对应提交；由于远程 GitHub TLS 拉取异常，实际使用本地 git bundle 同步到服务器，远程仓库最终位于提交 <code>f695ad6</code>。</li><li>修复远程运行环境：安装 <code>opencv-python-headless==4.11.0.86</code>，创建 <code>/home/featurize/datasets/visdrone -&gt; /home/featurize/visdrone</code> 数据软链，并执行 <code>scripts/prepare_visdrone.py</code> 生成 10% split。</li><li>启动训练命令：</li></ol>
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 PYTHONPATH=src:. nohup python3 scripts/train_dinov3_relation_distill.py \
   --config configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml \
   --name yolo26n_visdrone_10pct_imgsz960_dinov3_relation \
   &gt; runs/dinov3_distill/logs/yolo26n_visdrone_10pct_imgsz960_dinov3_relation.log 2&gt;&amp;1 &lt; /dev/null &amp;</code></pre>
-<ol>
-<li>5. 训练完成后读取 <code>results.csv</code>，按 best mAP50-95 选取最佳 epoch，并与同分辨率 <code>baseline_10pct_960</code> 对比。</li>
-<li>6. 从本地 <code>runs/baselines/yolo26n_visdrone_10pct_imgsz960/weights/best.pt</code> 同步 baseline 权重到远程同名目录，补跑同口径 small/medium/large AP。</li>
-<li>7. 使用 <code>scripts/evaluate_area_ap.py</code> 对 baseline 与 relation best 权重执行面积分组 AP 统计，参数均为 <code>--data configs/datasets/visdrone.yaml --imgsz 960 --conf 0.001 --iou 0.7 --max-det 300</code>。</li>
-</ol>
-</div><div class="sub-section"><h3>整体指标</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 baseline</th><th>best 权重</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.0000</td><td><code>runs/baselines/yolo26n_visdrone_10pct_imgsz960/weights/best.pt</code></td></tr><tr><td>dinov3_relation_10pct_960</td><td>105</td><td>0.3794</td><td>0.3055</td><td>0.2612</td><td>0.1448</td><td>+0.0004</td><td><code>runs/dinov3_distill/yolo26n_visdrone_10pct_imgsz960_dinov3_relation/weights/best.pt</code></td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>small / medium / large AP</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th><th>AP50-95 差值</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>0.2733</td><td>0.1160</td><td>26586</td><td>122198</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>small</td><td>0.2739</td><td>0.1155</td><td>26586</td><td>122603</td><td>-0.0005</td></tr><tr><td>baseline_10pct_960</td><td>medium</td><td>0.5745</td><td>0.3884</td><td>11105</td><td>34764</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>medium</td><td>0.5831</td><td>0.3949</td><td>11105</td><td>34374</td><td>+0.0065</td></tr><tr><td>baseline_10pct_960</td><td>large</td><td>0.6196</td><td>0.4885</td><td>1068</td><td>2545</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>large</td><td>0.6154</td><td>0.4760</td><td>1068</td><td>2414</td><td>-0.0126</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>relation distillation 的总体 best mAP50-95=0.1448，仅比 <code>baseline_10pct_960</code> 的 0.1444 高 +0.0004，属于边缘级提升，不能视为稳定有效收益。</li>
-<li>分面积指标显示，小目标 AP50-95 从 0.1160 微降到 0.1155；这说明 relation distillation 没有解决本项目最核心的 VisDrone 小目标检测瓶颈。</li>
-<li>中目标 AP50-95 从 0.3884 提升到 0.3949，是本轮总体 mAP 微弱提升的主要来源；大目标 AP50-95 从 0.4885 降到 0.4760。</li>
-<li>关系蒸馏没有像 objectness pretrain 那样造成明显负迁移，说明“弱辅助 + 检测 loss 主导”的方向比纯预训练更安全；但当前关系约束对小目标没有正向作用，可能因为 28x28 teacher token grid 对 VisDrone 极小目标仍然过粗。</li>
-<li>训练结束后 <code>best.pt</code> 中残留 forward hook 引用，直接评估会触发反序列化问题；本轮 area AP 使用只读兼容 wrapper 完成统计。后续应修复保存逻辑，导出 clean checkpoint 后再做 ONNX 与部署链路验证。</li>
-</ul>
+<ol><li>训练完成后读取 <code>results.csv</code>，按 best mAP50-95 选取最佳 epoch，并与同分辨率 <code>baseline_10pct_960</code> 对比。</li><li>从本地 <code>runs/baselines/yolo26n_visdrone_10pct_imgsz960/weights/best.pt</code> 同步 baseline 权重到远程同名目录，补跑同口径 small/medium/large AP。</li><li>使用 <code>scripts/evaluate_area_ap.py</code> 对 baseline 与 relation best 权重执行面积分组 AP 统计，参数均为 <code>--data configs/datasets/visdrone.yaml --imgsz 960 --conf 0.001 --iou 0.7 --max-det 300</code>。</li></ol>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">15</span> DINOv3 weak objectness auxiliary：lambda=0.05</div>
-<div class="section-body">
-<div class="sub-section"><h3>实验目的</h3>
+<div class="sub-section"><h3>整体指标</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 baseline</th><th>best 权重</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.0000</td><td><code>runs/baselines/yolo26n_visdrone_10pct_imgsz960/weights/best.pt</code></td></tr><tr><td>dinov3_relation_10pct_960</td><td>105</td><td>0.3794</td><td>0.3055</td><td>0.2612</td><td>0.1448</td><td>+0.0004</td><td><code>runs/dinov3_distill/yolo26n_visdrone_10pct_imgsz960_dinov3_relation/weights/best.pt</code></td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>small / medium / large AP</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th><th>AP50-95 差值</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>0.2733</td><td>0.1160</td><td>26586</td><td>122198</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>small</td><td>0.2739</td><td>0.1155</td><td>26586</td><td>122603</td><td>-0.0005</td></tr><tr><td>baseline_10pct_960</td><td>medium</td><td>0.5745</td><td>0.3884</td><td>11105</td><td>34764</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>medium</td><td>0.5831</td><td>0.3949</td><td>11105</td><td>34374</td><td>+0.0065</td></tr><tr><td>baseline_10pct_960</td><td>large</td><td>0.6196</td><td>0.4885</td><td>1068</td><td>2545</td><td>0.0000</td></tr><tr><td>dinov3_relation_10pct_960</td><td>large</td><td>0.6154</td><td>0.4760</td><td>1068</td><td>2414</td><td>-0.0126</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>relation distillation 的总体 best mAP50-95=0.1448，仅比 <code>baseline_10pct_960</code> 的 0.1444 高 +0.0004，属于边缘级提升，不能视为稳定有效收益。</li><li>分面积指标显示，小目标 AP50-95 从 0.1160 微降到 0.1155；这说明 relation distillation 没有解决本项目最核心的 VisDrone 小目标检测瓶颈。</li><li>中目标 AP50-95 从 0.3884 提升到 0.3949，是本轮总体 mAP 微弱提升的主要来源；大目标 AP50-95 从 0.4885 降到 0.4760。</li><li>关系蒸馏没有像 objectness pretrain 那样造成明显负迁移，说明“弱辅助 + 检测 loss 主导”的方向比纯预训练更安全；但当前关系约束对小目标没有正向作用，可能因为 28x28 teacher token grid 对 VisDrone 极小目标仍然过粗。</li><li>训练结束后 <code>best.pt</code> 中残留 forward hook 引用，直接评估会触发反序列化问题；本轮 area AP 使用只读兼容 wrapper 完成统计。后续应修复保存逻辑，导出 clean checkpoint 后再做 ONNX 与部署链路验证。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">15</span> DINOv3 weak objectness auxiliary：lambda=0.05</div><div class="section-body"><div class="sub-section"><h3>实验目的</h3>
 <p>前面的 tiled local contrast objectness pretrain 证明：DINOv3 局部显著性可以覆盖大量小目标，但如果让 YOLO 先单独拟合 dense objectness map，再用 10% 标注微调，会产生负迁移。本轮改成检测任务主导的联合训练：保留标准 YOLO detection loss，只额外加入低权重 DINOv3 tiled local-contrast objectness auxiliary loss，验证 DINO 信号是否能作为弱正则提升少标签检测。</p>
-</div><div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生模型：<code>YOLO26n</code>。</li>
-<li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li>
-<li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li>
-<li>DINOv3 objectness：复用 tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li>
-<li>辅助约束位置：YOLO layer <code>16</code>，使用 <code>1x1 Conv</code> objectness head 输出 dense logits。</li>
-<li>损失：<code>total_loss = detection_loss + 0.05 * 0.5 * (BCEWithLogits + Dice)</code>。</li>
-<li>配置文件：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml</code>。</li>
-<li>训练脚本：<code>scripts/train_dinov3_objectness_aux.py</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现步骤</h3>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+</div>
+<div class="sub-section"><h3>配置</h3>
+<ul><li>学生模型：<code>YOLO26n</code>。</li><li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li><li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li><li>DINOv3 objectness：复用 tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li><li>辅助约束位置：YOLO layer <code>16</code>，使用 <code>1x1 Conv</code> objectness head 输出 dense logits。</li><li>损失：<code>total_loss = detection_loss + 0.05 * 0.5 * (BCEWithLogits + Dice)</code>。</li><li>配置文件：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml</code>。</li><li>训练脚本：<code>scripts/train_dinov3_objectness_aux.py</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现步骤</h3>
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 PYTHONPATH=src:. nohup python3 scripts/train_dinov3_objectness_aux.py \
   --config configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml \
   --name yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005 \
   &gt; runs/dinov3_objectness/logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005.log 2&gt;&amp;1 &lt; /dev/null &amp;</code></pre>
 <p>训练完成后执行：</p>
-<pre><code>PYTHONPATH=src:. python3 scripts/evaluate_area_ap.py \
+<pre><code class="language-bash">PYTHONPATH=src:. python3 scripts/evaluate_area_ap.py \
   --model runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005/weights/best.pt \
   --data configs/datasets/visdrone.yaml \
   --imgsz 960 \
   --name yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_best \
   --output-dir runs/dinov3_objectness/reports/area_ap</code></pre>
 <p>ONNX 导出验证：</p>
-<pre><code>python3 - &lt;&lt;&#x27;PY&#x27;
+<pre><code class="language-bash">python3 - &lt;&lt;&#x27;PY&#x27;
 from ultralytics import YOLO
 model = YOLO(&quot;runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005/weights/best.pt&quot;)
 model.export(format=&quot;onnx&quot;, imgsz=960, simplify=True, opset=12)
 PY</code></pre>
-</div><div class="sub-section"><h3>整体指标</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 10%/960 baseline</th><th>相对 relation</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.0000</td><td>-0.0004</td></tr><tr><td>dinov3_relation_10pct_960</td><td>105</td><td>0.3794</td><td>0.3055</td><td>0.2612</td><td>0.1448</td><td>+0.0004</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>93</td><td>0.3688</td><td>0.3117</td><td>0.2629</td><td>0.1471</td><td>+0.0027</td><td>+0.0023</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>small / medium / large AP</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th><th>相对 baseline AP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>0.2733</td><td>0.1160</td><td>26586</td><td>122198</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>small</td><td>0.2754</td><td>0.1171</td><td>26586</td><td>123166</td><td>+0.0011</td></tr><tr><td>baseline_10pct_960</td><td>medium</td><td>0.5745</td><td>0.3884</td><td>11105</td><td>34764</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>medium</td><td>0.5717</td><td>0.3861</td><td>11105</td><td>33995</td><td>-0.0023</td></tr><tr><td>baseline_10pct_960</td><td>large</td><td>0.6196</td><td>0.4885</td><td>1068</td><td>2545</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>large</td><td>0.6314</td><td>0.4965</td><td>1068</td><td>2633</td><td>+0.0079</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>导出与可加载性</h3>
-<ul>
-<li><code>best.pt</code> 可被普通 Ultralytics <code>YOLO()</code> 加载，类型为 <code>DetectionModel</code>，没有 hook pickle 问题。</li>
-<li>ONNX 导出成功：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005/weights/best.onnx</code>，大小约 9.6 MB。</li>
-<li>导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_onnx.log</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>分析</h3>
-<ul>
-<li>这是当前 10%/960 设置下的最好结果，best mAP50-95=0.1471，相对 baseline +0.0027，相对 relation distillation +0.0023。</li>
-<li>small AP50-95 从 0.1160 提升到 0.1171，说明低权重 objectness auxiliary 对小目标有轻微正向作用，但提升幅度仍小。</li>
-<li>medium AP50-95 从 0.3884 降到 0.3861，说明本轮总体提升不是来自中目标；large AP50-95 从 0.4885 提升到 0.4965，是更明显的收益来源。</li>
-<li>相比纯 objectness pretrain，本轮没有负迁移，支持“检测 loss 主导、DINO objectness 低权重辅助”的路线；但 small AP 提升仍不足以证明问题已解决。</li>
-<li>后续应围绕 lambda 与 ignore-aware 做小网格，而不是再回到纯预训练：优先尝试 <code>lambda=0.02</code>、<code>lambda=0.10</code> 和 top-k/ignore objectness auxiliary。</li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">16</span> DINOv3 objectness auxiliary：lambda 扫描</div>
-<div class="section-body">
-<div class="sub-section"><h3>实验目的</h3>
+<div class="sub-section"><h3>整体指标</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>best epoch</th><th>P</th><th>R</th><th>mAP50</th><th>mAP50-95</th><th>相对 10%/960 baseline</th><th>相对 relation</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.1444</td><td>0.0000</td><td>-0.0004</td></tr><tr><td>dinov3_relation_10pct_960</td><td>105</td><td>0.3794</td><td>0.3055</td><td>0.2612</td><td>0.1448</td><td>+0.0004</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>93</td><td>0.3688</td><td>0.3117</td><td>0.2629</td><td>0.1471</td><td>+0.0027</td><td>+0.0023</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>small / medium / large AP</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th><th>相对 baseline AP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>0.2733</td><td>0.1160</td><td>26586</td><td>122198</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>small</td><td>0.2754</td><td>0.1171</td><td>26586</td><td>123166</td><td>+0.0011</td></tr><tr><td>baseline_10pct_960</td><td>medium</td><td>0.5745</td><td>0.3884</td><td>11105</td><td>34764</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>medium</td><td>0.5717</td><td>0.3861</td><td>11105</td><td>33995</td><td>-0.0023</td></tr><tr><td>baseline_10pct_960</td><td>large</td><td>0.6196</td><td>0.4885</td><td>1068</td><td>2545</td><td>0.0000</td></tr><tr><td>dinov3_objectness_aux_lam005_10pct_960</td><td>large</td><td>0.6314</td><td>0.4965</td><td>1068</td><td>2633</td><td>+0.0079</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>导出与可加载性</h3>
+<ul><li><code>best.pt</code> 可被普通 Ultralytics <code>YOLO()</code> 加载，类型为 <code>DetectionModel</code>，没有 hook pickle 问题。</li><li>ONNX 导出成功：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005/weights/best.onnx</code>，大小约 9.6 MB。</li><li>导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_onnx.log</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>这是当前 10%/960 设置下的最好结果，best mAP50-95=0.1471，相对 baseline +0.0027，相对 relation distillation +0.0023。</li><li>small AP50-95 从 0.1160 提升到 0.1171，说明低权重 objectness auxiliary 对小目标有轻微正向作用，但提升幅度仍小。</li><li>medium AP50-95 从 0.3884 降到 0.3861，说明本轮总体提升不是来自中目标；large AP50-95 从 0.4885 提升到 0.4965，是更明显的收益来源。</li><li>相比纯 objectness pretrain，本轮没有负迁移，支持“检测 loss 主导、DINO objectness 低权重辅助”的路线；但 small AP 提升仍不足以证明问题已解决。</li><li>后续应围绕 lambda 与 ignore-aware 做小网格，而不是再回到纯预训练：优先尝试 <code>lambda=0.02</code>、<code>lambda=0.10</code> 和 top-k/ignore objectness auxiliary。</li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">16</span> DINOv3 objectness auxiliary：lambda 扫描</div><div class="section-body"><div class="sub-section"><h3>实验目的</h3>
 <p>第 15 节的 <code>lambda=0.05</code> 单次实验显示 weak objectness auxiliary 有轻微正向收益，但提升幅度很小，且尚不清楚辅助损失权重是否过强或过弱。本轮固定模型、数据、输入分辨率、teacher signal 与训练轮次，只扫描 <code>lambda_objectness</code> 和 target mode，判断 DINOv3 objectness 约束的有效权重区间，并为后续多 seed 稳定性验证选择候选配置。</p>
-</div><div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生模型：<code>YOLO26n</code>。</li>
-<li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li>
-<li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li>
-<li>DINOv3 objectness：tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li>
-<li>辅助约束位置：YOLO layer <code>16</code>，<code>1x1 Conv</code> objectness head。</li>
-<li>扫描变量：</li>
-</ul>
-<p>- soft target：<code>lambda_objectness=0.02</code>、<code>0.10</code>。</p>
-<p>- ignore-aware target：<code>lambda_objectness=0.02</code>、<code>0.10</code>。</p>
-<ul>
-<li>对照基线：<code>baseline_10pct_960</code> mAP50-95=0.14439，普通 aux <code>lambda=0.05</code> 三 seed mean=0.14539，ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现步骤</h3>
+</div>
+<div class="sub-section"><h3>配置</h3>
+<ul><li>学生模型：<code>YOLO26n</code>。</li><li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li><li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li><li>DINOv3 objectness：tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li><li>辅助约束位置：YOLO layer <code>16</code>，<code>1x1 Conv</code> objectness head。</li><li>扫描变量：</li></ul>
+<p>- soft target：<code>lambda_objectness=0.02</code>、<code>0.10</code>。 - ignore-aware target：<code>lambda_objectness=0.02</code>、<code>0.10</code>。</p>
+<ul><li>对照基线：<code>baseline_10pct_960</code> mAP50-95=0.14439，普通 aux <code>lambda=0.05</code> 三 seed mean=0.14539，ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现步骤</h3>
 <p>四组实验使用同一训练脚本，仅替换配置文件：</p>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 
 PYTHONPATH=src:. python3 scripts/train_dinov3_objectness_aux.py \
   --config configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed42.yaml \
@@ -536,7 +262,7 @@ PYTHONPATH=src:. python3 scripts/train_dinov3_objectness_aux.py \
   --name yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_ignore_lam010_seed42</code></pre>
 <p>实际运行时通过顺序队列执行，队列日志为 <code>runs/dinov3_objectness/logs/objaux_lambda_scan_seed42_queue.log</code>，队列 PID 为 <code>runs/dinov3_objectness/objaux_lambda_scan_seed42_queue.pid</code>。</p>
 <p><code>soft lambda=0.02</code> 在 seed42 上取得本轮扫描最优后，继续补充 <code>seed=2026</code> 与 <code>seed=3407</code>，验证候选配置的随机种子稳定性：</p>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 
 PYTHONPATH=src:. python3 scripts/train_dinov3_objectness_aux.py \
   --config configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed2026.yaml \
@@ -546,15 +272,18 @@ PYTHONPATH=src:. python3 scripts/train_dinov3_objectness_aux.py \
   --config configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed3407.yaml \
   --name yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed3407</code></pre>
 <p>补充队列日志为 <code>runs/dinov3_objectness/logs/objaux_lam002_multiseed_queue.log</code>，队列 PID 为 <code>runs/dinov3_objectness/objaux_lam002_multiseed_queue.pid</code>。</p>
-</div><div class="sub-section"><h3>整体指标</h3>
+</div>
+<div class="sub-section"><h3>整体指标</h3>
 <div class="table-wrap"><table><thead><tr><th>实验</th><th>target mode</th><th>lambda</th><th>best epoch</th><th>P</th><th>R</th><th>best mAP50</th><th>best mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th><th>相对 baseline</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>none</td><td>0</td><td>110</td><td>0.37793</td><td>0.30026</td><td>0.25717</td><td>0.14439</td><td>0.25420</td><td>0.14201</td><td>0.00000</td></tr><tr><td>objaux_lam002_seed42</td><td>soft</td><td>0.02</td><td>106</td><td>N/A</td><td>N/A</td><td>0.26488</td><td>0.14792</td><td>0.25866</td><td>0.14325</td><td>+0.00353</td></tr><tr><td>objaux_lam005_seed42</td><td>soft</td><td>0.05</td><td>93</td><td>0.36878</td><td>0.31167</td><td>0.26292</td><td>0.14707</td><td>0.25487</td><td>0.14127</td><td>+0.00268</td></tr><tr><td>objaux_lam010_seed42</td><td>soft</td><td>0.10</td><td>100</td><td>N/A</td><td>N/A</td><td>0.25510</td><td>0.14243</td><td>0.25079</td><td>0.13869</td><td>-0.00196</td></tr><tr><td>objaux_ignore_lam002_seed42</td><td>ignore-aware</td><td>0.02</td><td>81</td><td>N/A</td><td>N/A</td><td>0.25792</td><td>0.14529</td><td>0.25154</td><td>0.13846</td><td>+0.00090</td></tr><tr><td>objaux_ignore_lam005_seed42</td><td>ignore-aware</td><td>0.05</td><td>N/A</td><td>N/A</td><td>N/A</td><td>N/A</td><td>0.14568</td><td>N/A</td><td>N/A</td><td>+0.00129</td></tr><tr><td>objaux_ignore_lam010_seed42</td><td>ignore-aware</td><td>0.10</td><td>106</td><td>N/A</td><td>N/A</td><td>0.26139</td><td>0.14518</td><td>0.25458</td><td>0.14096</td><td>+0.00079</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3><code>soft lambda=0.02</code> 多 seed 稳定性</h3>
+</div>
+<div class="sub-section"><h3><code>soft lambda=0.02</code> 多 seed 稳定性</h3>
 <div class="table-wrap"><table><thead><tr><th>seed</th><th>best epoch</th><th>best P</th><th>best R</th><th>best mAP50</th><th>best mAP50-95</th><th>last P</th><th>last R</th><th>last mAP50</th><th>last mAP50-95</th><th>best 权重</th></tr></thead><tbody><tr><td>42</td><td>106</td><td>N/A</td><td>N/A</td><td>0.26488</td><td>0.14792</td><td>0.38064</td><td>0.30728</td><td>0.25866</td><td>0.14325</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.pt</code></td></tr><tr><td>2026</td><td>81</td><td>N/A</td><td>N/A</td><td>0.26290</td><td>0.14604</td><td>0.38882</td><td>0.30425</td><td>0.25744</td><td>0.14161</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed2026/weights/best.pt</code></td></tr><tr><td>3407</td><td>92</td><td>N/A</td><td>N/A</td><td>0.26157</td><td>0.14626</td><td>0.38366</td><td>0.30474</td><td>0.25706</td><td>0.14307</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed3407/weights/best.pt</code></td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>统计项</th><th>mAP50</th><th>mAP50-95</th></tr></thead><tbody><tr><td>mean</td><td>0.26312</td><td>0.14674</td></tr><tr><td>std</td><td>0.00136</td><td>0.00084</td></tr><tr><td>相对 baseline_10pct_960 mean 差值</td><td>+0.00595</td><td>+0.00235</td></tr><tr><td>相对普通 aux lambda=0.05 三 seed mean 差值</td><td>N/A</td><td>+0.00135</td></tr><tr><td>相对 ignore-aware lambda=0.05 三 seed mean 差值</td><td>N/A</td><td>+0.00052</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3><code>soft lambda=0.02</code> small / medium / large AP 与导出验证</h3>
+</div>
+<div class="sub-section"><h3><code>soft lambda=0.02</code> small / medium / large AP 与导出验证</h3>
 <p>多 seed 训练完成后，对三个 seed 的 <code>best.pt</code> 执行普通 Ultralytics <code>YOLO()</code> 加载、small/medium/large AP 统计与 ONNX 导出。三组 <code>best.pt</code> 均可作为 clean <code>DetectionModel</code> 加载，未发现训练时 hook 残留；三组 ONNX 均导出成功，单个 ONNX 文件大小约 10.0 MB。</p>
 <p>复现命令如下：</p>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 
 PYTHONPATH=src:. python3 scripts/evaluate_area_ap.py \
   --model runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.pt \
@@ -572,74 +301,33 @@ PY</code></pre>
 <div class="table-wrap"><table><thead><tr><th>seed</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>42</td><td>small</td><td>0.27576</td><td>0.11725</td><td>26586</td><td>121818</td></tr><tr><td>42</td><td>medium</td><td>0.58402</td><td>0.39560</td><td>11105</td><td>34934</td></tr><tr><td>42</td><td>large</td><td>0.64101</td><td>0.51093</td><td>1068</td><td>2617</td></tr><tr><td>2026</td><td>small</td><td>0.27263</td><td>0.11449</td><td>26586</td><td>118387</td></tr><tr><td>2026</td><td>medium</td><td>0.58604</td><td>0.39420</td><td>11105</td><td>38503</td></tr><tr><td>2026</td><td>large</td><td>0.62169</td><td>0.47867</td><td>1068</td><td>2699</td></tr><tr><td>3407</td><td>small</td><td>0.27754</td><td>0.11573</td><td>26586</td><td>119858</td></tr><tr><td>3407</td><td>medium</td><td>0.58888</td><td>0.39713</td><td>11105</td><td>36759</td></tr><tr><td>3407</td><td>large</td><td>0.62338</td><td>0.49889</td><td>1068</td><td>2627</td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>area</th><th>AP50 mean</th><th>AP50 std</th><th>AP50-95 mean</th><th>AP50-95 std</th><th>相对 baseline AP50-95</th><th>相对普通 aux lambda=0.05 seed42 AP50-95</th></tr></thead><tbody><tr><td>small</td><td>0.27531</td><td>0.00203</td><td>0.11582</td><td>0.00113</td><td>-0.00019</td><td>-0.00127</td></tr><tr><td>medium</td><td>0.58631</td><td>0.00200</td><td>0.39565</td><td>0.00120</td><td>+0.00723</td><td>+0.00950</td></tr><tr><td>large</td><td>0.62870</td><td>0.00874</td><td>0.49616</td><td>0.01331</td><td>+0.00762</td><td>-0.00030</td></tr></tbody></table></div>
 <div class="table-wrap"><table><thead><tr><th>seed</th><th>ONNX 路径</th><th>大小</th></tr></thead><tbody><tr><td>42</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.onnx</code></td><td>10021889 bytes</td></tr><tr><td>2026</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed2026/weights/best.onnx</code></td><td>10021889 bytes</td></tr><tr><td>3407</td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed3407/weights/best.onnx</code></td><td>10021889 bytes</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>结果与分析</h3>
-<ul>
-<li><code>soft lambda=0.02</code> 是本轮最强单次结果，seed42 best mAP50-95=0.14792，相对 10%/960 baseline 提升 +0.00353，也超过普通 aux <code>lambda=0.05</code> seed42 的 0.14707。</li>
-<li><code>soft lambda=0.02</code> 三 seed mean mAP50-95=0.14674，std=0.00084；相比 baseline_10pct_960 的 0.14439 提升 +0.00235，相比普通 aux <code>lambda=0.05</code> 三 seed mean=0.14539 提升 +0.00135，相比 ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622 提升 +0.00052。</li>
-<li>area AP 显示总体提升并不来自 small object：small AP50-95 mean=0.11582，略低于 baseline_10pct_960 的 0.11601，也低于普通 aux <code>lambda=0.05</code> seed42 的 0.11709。</li>
-<li>medium/large 是 <code>soft lambda=0.02</code> 主要收益来源：medium AP50-95 mean=0.39565，相对 baseline +0.00723；large AP50-95 mean=0.49616，相对 baseline +0.00762，但 large 相对普通 aux <code>lambda=0.05</code> seed42 基本持平略低。</li>
-<li>三组 <code>best.pt</code> 均可被普通 Ultralytics <code>YOLO()</code> 加载并成功导出 ONNX，说明当前 auxiliary 训练脚本的保存产物满足 YOLO-only 部署链路要求。</li>
-<li><code>soft lambda=0.10</code> 明显下降到 0.14243，低于 baseline，说明 objectness 约束过强时会压制检测主任务，形成负迁移。</li>
-<li>ignore-aware 三个权重下都没有明显崩溃，但 <code>lambda=0.02/0.10</code> 单次都低于 ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622，当前证据不支持继续优先扩大 ignore-aware lambda 扫描。</li>
-<li><code>soft lambda=0.02</code> 的 best epoch=106，仍在 120 epoch 内完成主要收敛；结合 200 epoch 测试没有显著突破上限，后续优先补多 seed，而不是先延长训练轮次。</li>
-<li>多 seed 结果显示 <code>soft lambda=0.02</code> 的总体 mAP 提升方向较稳，但和项目目标存在偏差：它提升了 overall mAP50-95，却没有稳定提升 small AP50-95。因此它可以作为“安全 weak auxiliary”候选，但不能证明 DINO objectness 已经把小目标能力有效迁移给 YOLO。</li>
-</ul>
-</div><div class="sub-section"><h3>产物路径</h3>
-<ul>
-<li><code>soft lambda=0.02</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.pt</code></li>
-<li><code>soft lambda=0.02 seed2026</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed2026/weights/best.pt</code></li>
-<li><code>soft lambda=0.02 seed3407</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed3407/weights/best.pt</code></li>
-<li><code>soft lambda=0.02</code> area AP 目录：<code>runs/dinov3_objectness/reports/area_ap/*lam002*_best_area_ap.csv</code></li>
-<li><code>soft lambda=0.02</code> ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/*lam002*_onnx.log</code></li>
-<li><code>soft lambda=0.10</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam010_seed42/weights/best.pt</code></li>
-<li><code>ignore-aware lambda=0.02</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_ignore_lam002_seed42/weights/best.pt</code></li>
-<li><code>ignore-aware lambda=0.10</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_ignore_lam010_seed42/weights/best.pt</code></li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">17</span> 小目标定向 DINOv3 objectness auxiliary：target-focus seed42 screening</div>
-<div class="section-body">
-<div class="sub-section"><h3>实验目的</h3>
+<div class="sub-section"><h3>结果与分析</h3>
+<ul><li><code>soft lambda=0.02</code> 是本轮最强单次结果，seed42 best mAP50-95=0.14792，相对 10%/960 baseline 提升 +0.00353，也超过普通 aux <code>lambda=0.05</code> seed42 的 0.14707。</li><li><code>soft lambda=0.02</code> 三 seed mean mAP50-95=0.14674，std=0.00084；相比 baseline_10pct_960 的 0.14439 提升 +0.00235，相比普通 aux <code>lambda=0.05</code> 三 seed mean=0.14539 提升 +0.00135，相比 ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622 提升 +0.00052。</li><li>area AP 显示总体提升并不来自 small object：small AP50-95 mean=0.11582，略低于 baseline_10pct_960 的 0.11601，也低于普通 aux <code>lambda=0.05</code> seed42 的 0.11709。</li><li>medium/large 是 <code>soft lambda=0.02</code> 主要收益来源：medium AP50-95 mean=0.39565，相对 baseline +0.00723；large AP50-95 mean=0.49616，相对 baseline +0.00762，但 large 相对普通 aux <code>lambda=0.05</code> seed42 基本持平略低。</li><li>三组 <code>best.pt</code> 均可被普通 Ultralytics <code>YOLO()</code> 加载并成功导出 ONNX，说明当前 auxiliary 训练脚本的保存产物满足 YOLO-only 部署链路要求。</li><li><code>soft lambda=0.10</code> 明显下降到 0.14243，低于 baseline，说明 objectness 约束过强时会压制检测主任务，形成负迁移。</li><li>ignore-aware 三个权重下都没有明显崩溃，但 <code>lambda=0.02/0.10</code> 单次都低于 ignore-aware <code>lambda=0.05</code> 三 seed mean=0.14622，当前证据不支持继续优先扩大 ignore-aware lambda 扫描。</li><li><code>soft lambda=0.02</code> 的 best epoch=106，仍在 120 epoch 内完成主要收敛；结合 200 epoch 测试没有显著突破上限，后续优先补多 seed，而不是先延长训练轮次。</li><li>多 seed 结果显示 <code>soft lambda=0.02</code> 的总体 mAP 提升方向较稳，但和项目目标存在偏差：它提升了 overall mAP50-95，却没有稳定提升 small AP50-95。因此它可以作为“安全 weak auxiliary”候选，但不能证明 DINO objectness 已经把小目标能力有效迁移给 YOLO。</li></ul>
+</div>
+<div class="sub-section"><h3>产物路径</h3>
+<ul><li><code>soft lambda=0.02</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.pt</code></li><li><code>soft lambda=0.02 seed2026</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed2026/weights/best.pt</code></li><li><code>soft lambda=0.02 seed3407</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed3407/weights/best.pt</code></li><li><code>soft lambda=0.02</code> area AP 目录：<code>runs/dinov3_objectness/reports/area_ap/*lam002*_best_area_ap.csv</code></li><li><code>soft lambda=0.02</code> ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/*lam002*_onnx.log</code></li><li><code>soft lambda=0.10</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam010_seed42/weights/best.pt</code></li><li><code>ignore-aware lambda=0.02</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_ignore_lam002_seed42/weights/best.pt</code></li><li><code>ignore-aware lambda=0.10</code> best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_ignore_lam010_seed42/weights/best.pt</code></li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">17</span> 小目标定向 DINOv3 objectness auxiliary：target-focus seed42 screening</div><div class="section-body"><div class="sub-section"><h3>实验目的</h3>
 <p>第 16 节的 <code>soft lambda=0.02</code> 三 seed 结果显示 overall mAP50-95 有稳定小幅提升，但 small AP50-95 mean=0.11582，略低于 baseline_10pct_960 的 0.11601。说明继续扩大 lambda 网格不是主要矛盾。本轮改造 teacher target，验证两类更偏小目标/实例中心的 objectness 目标是否能真正提升 small AP。</p>
-</div><div class="sub-section"><h3>配置</h3>
-<ul>
-<li>学生模型：<code>YOLO26n</code>。</li>
-<li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li>
-<li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li>
-<li>DINOv3 objectness：tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li>
-<li>辅助约束位置：YOLO layer <code>16</code>，<code>1x1 Conv</code> objectness head。</li>
-<li>共同权重：<code>lambda_objectness=0.02</code>。</li>
-<li>新增 target 模块：<code>src/vfm_yolo_distillation/objectness_targets.py</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>Arm A：Small-GT-Aware Soft Objectness</h3>
-<ul>
-<li><code>target_mode=small_gt_weighted_soft</code>。</li>
-<li>训练名：<code>yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42</code>。</li>
-<li>核心策略：仍使用 DINO tiled local-contrast soft target，但从 10% 标注训练 batch 中读取 GT box，只用于 auxiliary loss 权重图。</li>
-<li>权重设计：背景 <code>0.25</code>，small GT 邻域 <code>3.0</code>，medium GT 邻域 <code>1.0</code>，large GT 邻域 <code>0.5</code>。</li>
-<li>false positive 抑制：若 DINO target 高于 batch 内 <code>0.85</code> 分位且不落在任意 GT 邻域，权重降为 <code>0.05</code>。</li>
-<li>面积阈值：<code>small_area_px=1024</code>，<code>medium_area_px=9216</code>，<code>box_expand_cells=1</code>。</li>
-</ul>
-</div><div class="sub-section"><h3>Arm B：Peak-Only Ignore-Aware Objectness</h3>
-<ul>
-<li><code>target_mode=peak_ignore_aware</code>。</li>
-<li>训练名：<code>yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42</code>。</li>
-<li>核心策略：不使用 GT 权重，仅处理 DINO target。</li>
-<li>局部峰值：<code>peak_kernel=3</code>，使用 max-pool 找局部峰值。</li>
-<li>正样本：局部峰值且 target ≥ <code>positive_quantile=0.85</code>。</li>
-<li>负样本：target ≤ <code>negative_quantile=0.45</code>。</li>
-<li>中间区域 ignore，目标是去掉 dense soft map 的大面积平滑响应，只保留更像实例中心的 objectness 信号。</li>
-</ul>
-</div><div class="sub-section"><h3>可复现步骤</h3>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+</div>
+<div class="sub-section"><h3>配置</h3>
+<ul><li>学生模型：<code>YOLO26n</code>。</li><li>数据：<code>configs/datasets/visdrone_10pct.yaml</code> 训练，完整 VisDrone val 验证。</li><li>训练参数：<code>imgsz=960</code>、<code>epochs=120</code>、<code>batch=16</code>、<code>workers=8</code>、<code>seed=42</code>、<code>optimizer=auto</code>、<code>patience=100</code>、<code>close_mosaic=10</code>、<code>amp=True</code>。</li><li>DINOv3 objectness：tiled local contrast，<code>tile_size=480</code>、<code>tile_stride=240</code>、teacher input <code>448</code>、patch grid <code>28x28</code>。</li><li>辅助约束位置：YOLO layer <code>16</code>，<code>1x1 Conv</code> objectness head。</li><li>共同权重：<code>lambda_objectness=0.02</code>。</li><li>新增 target 模块：<code>src/vfm_yolo_distillation/objectness_targets.py</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>Arm A：Small-GT-Aware Soft Objectness</h3>
+<ul><li><code>target_mode=small_gt_weighted_soft</code>。</li><li>训练名：<code>yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42</code>。</li><li>核心策略：仍使用 DINO tiled local-contrast soft target，但从 10% 标注训练 batch 中读取 GT box，只用于 auxiliary loss 权重图。</li><li>权重设计：背景 <code>0.25</code>，small GT 邻域 <code>3.0</code>，medium GT 邻域 <code>1.0</code>，large GT 邻域 <code>0.5</code>。</li><li>false positive 抑制：若 DINO target 高于 batch 内 <code>0.85</code> 分位且不落在任意 GT 邻域，权重降为 <code>0.05</code>。</li><li>面积阈值：<code>small_area_px=1024</code>，<code>medium_area_px=9216</code>，<code>box_expand_cells=1</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>Arm B：Peak-Only Ignore-Aware Objectness</h3>
+<ul><li><code>target_mode=peak_ignore_aware</code>。</li><li>训练名：<code>yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42</code>。</li><li>核心策略：不使用 GT 权重，仅处理 DINO target。</li><li>局部峰值：<code>peak_kernel=3</code>，使用 max-pool 找局部峰值。</li><li>正样本：局部峰值且 target ≥ <code>positive_quantile=0.85</code>。</li><li>负样本：target ≤ <code>negative_quantile=0.45</code>。</li><li>中间区域 ignore，目标是去掉 dense soft map 的大面积平滑响应，只保留更像实例中心的 objectness 信号。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现步骤</h3>
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 
 PYTHONPATH=src:.:scripts python3 scripts/train_dinov3_objectness_aux.py   --config configs/experiments/dinov3_objectness_aux_smallgt_visdrone_10pct_imgsz960_lam002_seed42.yaml
 
 PYTHONPATH=src:.:scripts python3 scripts/train_dinov3_objectness_aux.py   --config configs/experiments/dinov3_objectness_aux_peak_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></pre>
 <p>实际运行使用顺序队列执行，队列日志为 <code>runs/dinov3_objectness/logs/objaux_target_focus_screen_seed42_queue.log</code>，队列 PID 为 <code>runs/dinov3_objectness/objaux_target_focus_screen_seed42_queue.pid</code>。</p>
 <p>训练后验收命令：</p>
-<pre><code>cd /home/featurize/vfm-yolo-distillation
+<pre><code class="language-bash">cd /home/featurize/vfm-yolo-distillation
 
 PYTHONPATH=src:. python3 scripts/evaluate_area_ap.py   --model runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.pt   --data configs/datasets/visdrone_10pct.yaml   --imgsz 960   --name yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42   --output-dir runs/dinov3_objectness/area_ap
 
@@ -649,106 +337,60 @@ model = YOLO(&quot;runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3
 model.export(format=&quot;onnx&quot;, imgsz=960, opset=12, simplify=False)
 PY</code></pre>
 <p>Arm B 使用相同命令，仅替换模型目录和 <code>--name</code>。</p>
-</div><div class="sub-section"><h3>整体指标</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>target mode</th><th>lambda</th><th>best epoch</th><th>P</th><th>R</th><th>best mAP50</th><th>best mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th><th>相对 baseline mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>none</td><td>0</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.14439</td><td>0.2542</td><td>0.1420</td><td>0.00000</td></tr><tr><td>objaux_soft_lam002_seed42</td><td>soft</td><td>0.02</td><td>106</td><td>N/A</td><td>N/A</td><td>0.26488</td><td>0.14792</td><td>0.25866</td><td>0.14325</td><td>+0.00353</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>small_gt_weighted_soft</td><td>0.02</td><td>85</td><td>0.3703</td><td>0.3024</td><td>0.26137</td><td>0.14549</td><td>0.25569</td><td>0.14203</td><td>+0.00110</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>peak_ignore_aware</td><td>0.02</td><td>81</td><td>0.3692</td><td>0.2995</td><td>0.25875</td><td>0.14423</td><td>0.25352</td><td>0.13995</td><td>-0.00016</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>small / medium / large AP</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>N/A</td><td>0.11601</td><td>26586</td><td>N/A</td></tr><tr><td>objaux_lam002_seed42</td><td>small</td><td>0.27576</td><td>0.11725</td><td>26586</td><td>121818</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>small</td><td>0.27278</td><td>0.11568</td><td>26586</td><td>121992</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>small</td><td>0.26752</td><td>0.11214</td><td>26586</td><td>118209</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>medium</td><td>0.57387</td><td>0.38734</td><td>11105</td><td>35300</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>medium</td><td>0.57423</td><td>0.38786</td><td>11105</td><td>38963</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>large</td><td>0.58702</td><td>0.45599</td><td>1068</td><td>2445</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>large</td><td>0.60701</td><td>0.48081</td><td>1068</td><td>2575</td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>clean YOLO 加载与 ONNX 导出</h3>
-<div class="table-wrap"><table><thead><tr><th>实验</th><th>clean <code>YOLO()</code></th><th>ONNX 路径</th><th>导出日志</th></tr></thead><tbody><tr><td>objaux_smallgt_lam002_seed42</td><td>通过，<code>task=detect</code>，<code>names=10</code></td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.onnx</code></td><td><code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_clean_load_onnx.log</code></td></tr><tr><td>objaux_peak_lam002_seed42</td><td>通过，<code>task=detect</code>，<code>names=10</code></td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.onnx</code></td><td><code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_clean_load_onnx.log</code></td></tr></tbody></table></div>
-</div><div class="sub-section"><h3>结果与分析</h3>
-<ul>
-<li>Arm A <code>small_gt_weighted_soft</code> 的 best mAP50-95=0.14549，高于 baseline_10pct_960 的 0.14439，但低于 <code>soft lambda=0.02 seed42</code> 的 0.14792，也低于 <code>soft lambda=0.02</code> 三 seed mean=0.14674。</li>
-<li>Arm A 的 small AP50-95=0.11568，低于 baseline_10pct_960 的 0.11601，也低于 <code>soft lambda=0.02 seed42</code> 的 0.11725。因此 GT-size-aware weighting 没有达成“小目标定向提升”的筛选标准。</li>
-<li>Arm B <code>peak_ignore_aware</code> 的 best mAP50-95=0.14423，略低于 baseline；small AP50-95=0.11214，明显低于 baseline。说明只保留 DINO 局部峰值会丢失过多可用监督，尤其对密集小目标不利。</li>
-<li>两组都通过 clean <code>YOLO()</code> 加载和 ONNX 导出，部署链路仍然是 YOLO-only，没有训练时 teacher/head 依赖残留。</li>
-<li>严格按预设判定规则：进入多 seed 的条件是 small AP50-95 ≥ 0.1170 且 overall mAP50-95 ≥ 0.14439。Arm A overall 达标但 small AP 不达标；Arm B 两项都不达标。因此本轮不应补多 seed，应停止训练扩展，转入 target 审计。</li>
-<li>关键负向结论：简单地用 GT 小目标邻域加权 DINO dense soft objectness，不足以把 DINO signal 转化为 small AP 收益。问题可能不在 lambda，而在 target 空间与检测头学习目标之间的对齐：DINO local contrast 仍更容易响应边缘/局部纹理/中大目标结构，小目标中心的稳定性不够。</li>
-</ul>
-</div><div class="sub-section"><h3>产物路径</h3>
-<ul>
-<li>Arm A 配置：<code>configs/experiments/dinov3_objectness_aux_smallgt_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li>
-<li>Arm B 配置：<code>configs/experiments/dinov3_objectness_aux_peak_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li>
-<li>Arm A best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.pt</code></li>
-<li>Arm B best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.pt</code></li>
-<li>Arm A area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_area_ap.csv</code></li>
-<li>Arm B area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_area_ap.csv</code></li>
-<li>Arm A ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.onnx</code></li>
-<li>Arm B ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.onnx</code></li>
-</ul>
 </div>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">18</span> 总体结论</div>
-<div class="section-body">
-<ul>
-<li>小目标定向 target-focus screening 显示，<code>small_gt_weighted_soft</code> 的 overall mAP50-95=0.1455 略高于 baseline，但 small AP50-95=0.1157，低于 baseline；<code>peak_ignore_aware</code> 的 overall 和 small AP 均未达标。因此本轮不应补多 seed，应转入 target 审计，重点检查 DINO local-contrast target 对小目标中心、边缘纹理和道路背景的响应分布。</li>
-<li>提高标签预算和提高输入分辨率都能稳定提升 VisDrone 检测，尤其对小目标更明显。</li>
-<li>DINOv3 global 与全图 patch 蒸馏收益不稳定，全图 patch 甚至降低 small AP。</li>
-<li>region-aware patch 蒸馏小幅提升 overall mAP50-95 与 small AP50-95，是当前直接特征蒸馏中最好的设置，但提升仍是边缘级别。</li>
-<li>DINOv3 relation distillation 在 10%/960 上只带来 +0.0004 mAP50-95 的边缘提升；分面积统计显示收益来自 medium object，小目标 AP50-95 微降，因此暂不能证明其实现了“小目标看世界”能力迁移。</li>
-<li>DINOv3 weak objectness auxiliary lambda=0.05 在 10%/960 上达到 mAP50-95=0.1471，是当前少标签 960 设置下最好结果；small AP50-95 小幅提升 +0.0011，但主要收益仍来自 large object。</li>
-<li>DINOv3 weak objectness auxiliary lambda 扫描显示，普通 soft target 的 <code>lambda=0.02</code> 在 seed42 上达到 mAP50-95=0.1479，是当前最强单次结果；补充三 seed后 mean mAP50-95=0.1467，std=0.0008，高于 baseline、普通 aux <code>lambda=0.05</code> 与 ignore-aware <code>lambda=0.05</code> 三 seed 均值。</li>
-<li>但 <code>soft lambda=0.02</code> 的 small AP50-95 mean=0.1158，略低于 baseline_10pct_960 的 0.1160；其总体收益主要来自 medium/large，因此它不是“小目标能力迁移”问题的充分答案。</li>
-<li>第一轮 DINOv3 objectness 审计显示，全图 patch 显著性更偏道路/场景结构，不足以直接作为小目标 objectness 监督。</li>
-<li>第二轮局部 objectness 审计显示，local contrast/residual 明显提高 GT 与小目标覆盖率，说明 DINOv3 patch token 的局部差异比全局显著性更接近实例级目标性。</li>
-<li>第三轮 tiled local contrast 进一步将 small_top20_recall 提升到 0.8352，是当前最强的无标注 objectness teacher signal。</li>
-<li>但是，第 12-13 节训练实验表明：把 tiled local_contrast 作为纯 objectness pretrain 密集监督后，所有 10%/960 fine-tune 结果均低于 baseline；最佳消融 mAP50-95=0.1338，仍低于 baseline=0.1444。</li>
-<li>因此当前结论是：DINOv3 确实能提供类别无关局部显著性，但“纯 objectness pretrain -&gt; 监督微调”的桥接方式会产生负迁移；检测任务主导、低权重的 weak objectness auxiliary 是目前更可靠的桥接方式，其中 <code>soft lambda=0.02</code> 是当前最稳的 overall mAP 候选，但还没有解决 small object AP。下一步应把重点从继续调 lambda 转向“让 teacher objectness 更聚焦小目标”的目标构造与对齐策略。</li>
-</ul>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">19</span> 下一步计划</div>
-<div class="section-body">
-<ol>
-<li>1. 停止继续扩大纯 objectness pretrain 网格，不再单独尝试更长 epoch 或更大 lambda。</li>
-<li>2. 暂停继续扩大 lambda 网格；<code>soft lambda=0.02</code> 可保留为 overall mAP 主候选，但不能作为小目标路线的最终证据。</li>
-<li>3. 基于 target-focus screening 的负向结果，重新审计 tiled local-contrast target 与 GT 小目标的空间对齐，重点分析 false positive 道路/背景区域、小目标中心低响应区域，以及 peak-only 策略为何损失密集小目标信号。</li>
-<li>4. 设计更偏小目标的 objectness target：例如 GT-size-aware weighting、small-object crop/tile mining、仅在高局部对比且非大面积区域上施加辅助约束。</li>
-<li>5. 比较 layer 16、layer 19 与 multi-layer auxiliary 的差异，确认 small AP 无提升是否来自辅助约束层级不匹配。</li>
-<li>6. 继续保持 clean-weight 与 ONNX 导出作为每个候选配置的必检项，确保部署链路始终是 YOLO-only。</li>
-</ol>
-</div></section>
-<section class="section">
-<div class="section-header"><span class="section-number">20</span> 文件索引</div>
-<div class="section-body">
-<ul>
-<li>主报告 Markdown：<code>runs/reports/visdrone_yolo26n_experiment_report.md</code></li>
-<li>主报告 HTML：<code>runs/reports/visdrone_yolo26n_experiment_report.html</code></li>
-<li>全部实验指标：<code>runs/reports/tables/all_experiments_summary.csv</code></li>
-<li>全部面积 AP：<code>runs/reports/tables/all_area_ap_summary.csv</code></li>
-<li>分辨率对比：<code>runs/reports/tables/imgsz_comparison.csv</code></li>
-<li>objectness 预训练消融汇总：<code>runs/reports/tables/objectness_pretrain_ablation_summary.csv</code></li>
-<li>objectness 可复现索引：<code>runs/reports/tables/objectness_reproducibility_index.csv</code></li>
-<li>10%/960 baseline 本地产物：<code>runs/baselines/yolo26n_visdrone_10pct_imgsz960</code></li>
-<li>10%/960 baseline 面积分组 AP：<code>runs/baselines/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_best_area_ap.csv</code></li>
-<li>DINOv3 relation 配置：<code>configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml</code></li>
-<li>DINOv3 relation 训练脚本：<code>scripts/train_dinov3_relation_distill.py</code></li>
-<li>DINOv3 relation 结果目录：<code>runs/dinov3_distill/yolo26n_visdrone_10pct_imgsz960_dinov3_relation</code></li>
-<li>DINOv3 relation 面积分组 AP：<code>runs/dinov3_distill/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_relation_best_area_ap.csv</code></li>
-<li>DINOv3 weak objectness auxiliary 配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml</code></li>
-<li>DINOv3 weak objectness auxiliary 训练脚本：<code>scripts/train_dinov3_objectness_aux.py</code></li>
-<li>DINOv3 weak objectness auxiliary 结果目录：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005</code></li>
-<li>DINOv3 weak objectness auxiliary 面积分组 AP：<code>runs/dinov3_objectness/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_best_area_ap.csv</code></li>
-<li>DINOv3 weak objectness auxiliary ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_onnx.log</code></li>
-<li>DINOv3 objectness auxiliary lambda 扫描配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam010_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_ignore_aware_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_ignore_aware_visdrone_10pct_imgsz960_lam010_seed42.yaml</code></li>
-<li>DINOv3 objectness auxiliary lambda 扫描日志：<code>runs/dinov3_objectness/logs/objaux_lambda_scan_seed42_queue.log</code></li>
-<li>DINOv3 objectness auxiliary lambda=0.02 多 seed 配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed2026.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed3407.yaml</code></li>
-<li>DINOv3 objectness auxiliary lambda=0.02 多 seed 日志：<code>runs/dinov3_objectness/logs/objaux_lam002_multiseed_queue.log</code></li>
-<li>DINOv3 objectness auxiliary lambda=0.02 area AP：<code>runs/dinov3_objectness/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42_best_area_ap.csv</code>、<code>...seed2026_best_area_ap.csv</code>、<code>...seed3407_best_area_ap.csv</code></li>
-<li>DINOv3 objectness auxiliary lambda=0.02 ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.onnx</code>、<code>...seed2026/weights/best.onnx</code>、<code>...seed3407/weights/best.onnx</code></li>
-<li>DINOv3 objectness auxiliary lambda=0.02 评估导出队列日志：<code>runs/dinov3_objectness/logs/objaux_lam002_eval_export_queue.log</code></li>
-<li>DINOv3 objectness target-focus 配置：<code>configs/experiments/dinov3_objectness_aux_smallgt_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_peak_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li>
-<li>DINOv3 objectness target-focus area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_area_ap.csv</code>、<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_area_ap.csv</code></li>
-<li>DINOv3 objectness target-focus ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_clean_load_onnx.log</code>、<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_clean_load_onnx.log</code></li>
-<li>objectness 主实验：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objectness_pretrain</code>、<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objectness_pretrain_ft</code></li>
-<li>objectness 定位消融：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objpre_lam010_ep5</code>、<code>..._lam010_ep10</code>、<code>..._lam025_ep5</code> 及对应 <code>_ft</code> 微调目录</li>
-<li>objectness 日志：<code>runs/dinov3_objectness/logs/yolo26n_objectness_pretrain_ft_10pct960.log</code>、<code>runs/dinov3_objectness/logs/objectness_ablation_queue.log</code></li>
-<li>第一轮 objectness 审计：<code>runs/dinov3_objectness/audit_train300_448</code></li>
-<li>第二轮 objectness 审计：<code>runs/dinov3_objectness/audit_train300_448_local_contrast</code>、<code>audit_train300_448_local_residual</code>、<code>audit_train300_448_local_fusion</code></li>
-<li>第三轮 tiled objectness 审计：<code>runs/dinov3_objectness/audit_train300_448_tiled_local_contrast_t480_s240</code></li>
-</ul>
-</div></section>
-<div class="report-footer">由 experiment-report skill 生成 · 2026-06-24T13:52:07+08:00</div>
+<div class="sub-section"><h3>整体指标</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>target mode</th><th>lambda</th><th>best epoch</th><th>P</th><th>R</th><th>best mAP50</th><th>best mAP50-95</th><th>last mAP50</th><th>last mAP50-95</th><th>相对 baseline mAP50-95</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>none</td><td>0</td><td>110</td><td>0.3779</td><td>0.3003</td><td>0.2572</td><td>0.14439</td><td>0.2542</td><td>0.1420</td><td>0.00000</td></tr><tr><td>objaux_soft_lam002_seed42</td><td>soft</td><td>0.02</td><td>106</td><td>N/A</td><td>N/A</td><td>0.26488</td><td>0.14792</td><td>0.25866</td><td>0.14325</td><td>+0.00353</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>small_gt_weighted_soft</td><td>0.02</td><td>85</td><td>0.3703</td><td>0.3024</td><td>0.26137</td><td>0.14549</td><td>0.25569</td><td>0.14203</td><td>+0.00110</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>peak_ignore_aware</td><td>0.02</td><td>81</td><td>0.3692</td><td>0.2995</td><td>0.25875</td><td>0.14423</td><td>0.25352</td><td>0.13995</td><td>-0.00016</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>small / medium / large AP</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>area</th><th>AP50</th><th>AP50-95</th><th>GT</th><th>Pred</th></tr></thead><tbody><tr><td>baseline_10pct_960</td><td>small</td><td>N/A</td><td>0.11601</td><td>26586</td><td>N/A</td></tr><tr><td>objaux_lam002_seed42</td><td>small</td><td>0.27576</td><td>0.11725</td><td>26586</td><td>121818</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>small</td><td>0.27278</td><td>0.11568</td><td>26586</td><td>121992</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>small</td><td>0.26752</td><td>0.11214</td><td>26586</td><td>118209</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>medium</td><td>0.57387</td><td>0.38734</td><td>11105</td><td>35300</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>medium</td><td>0.57423</td><td>0.38786</td><td>11105</td><td>38963</td></tr><tr><td>objaux_smallgt_lam002_seed42</td><td>large</td><td>0.58702</td><td>0.45599</td><td>1068</td><td>2445</td></tr><tr><td>objaux_peak_lam002_seed42</td><td>large</td><td>0.60701</td><td>0.48081</td><td>1068</td><td>2575</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>clean YOLO 加载与 ONNX 导出</h3>
+<div class="table-wrap"><table><thead><tr><th>实验</th><th>clean <code>YOLO()</code></th><th>ONNX 路径</th><th>导出日志</th></tr></thead><tbody><tr><td>objaux_smallgt_lam002_seed42</td><td>通过，<code>task=detect</code>，<code>names=10</code></td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.onnx</code></td><td><code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_clean_load_onnx.log</code></td></tr><tr><td>objaux_peak_lam002_seed42</td><td>通过，<code>task=detect</code>，<code>names=10</code></td><td><code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.onnx</code></td><td><code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_clean_load_onnx.log</code></td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>结果与分析</h3>
+<ul><li>Arm A <code>small_gt_weighted_soft</code> 的 best mAP50-95=0.14549，高于 baseline_10pct_960 的 0.14439，但低于 <code>soft lambda=0.02 seed42</code> 的 0.14792，也低于 <code>soft lambda=0.02</code> 三 seed mean=0.14674。</li><li>Arm A 的 small AP50-95=0.11568，低于 baseline_10pct_960 的 0.11601，也低于 <code>soft lambda=0.02 seed42</code> 的 0.11725。因此 GT-size-aware weighting 没有达成“小目标定向提升”的筛选标准。</li><li>Arm B <code>peak_ignore_aware</code> 的 best mAP50-95=0.14423，略低于 baseline；small AP50-95=0.11214，明显低于 baseline。说明只保留 DINO 局部峰值会丢失过多可用监督，尤其对密集小目标不利。</li><li>两组都通过 clean <code>YOLO()</code> 加载和 ONNX 导出，部署链路仍然是 YOLO-only，没有训练时 teacher/head 依赖残留。</li><li>严格按预设判定规则：进入多 seed 的条件是 small AP50-95 ≥ 0.1170 且 overall mAP50-95 ≥ 0.14439。Arm A overall 达标但 small AP 不达标；Arm B 两项都不达标。因此本轮不应补多 seed，应停止训练扩展，转入 target 审计。</li><li>关键负向结论：简单地用 GT 小目标邻域加权 DINO dense soft objectness，不足以把 DINO signal 转化为 small AP 收益。问题可能不在 lambda，而在 target 空间与检测头学习目标之间的对齐：DINO local contrast 仍更容易响应边缘/局部纹理/中大目标结构，小目标中心的稳定性不够。</li></ul>
+</div>
+<div class="sub-section"><h3>产物路径</h3>
+<ul><li>Arm A 配置：<code>configs/experiments/dinov3_objectness_aux_smallgt_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li><li>Arm B 配置：<code>configs/experiments/dinov3_objectness_aux_peak_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li><li>Arm A best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.pt</code></li><li>Arm B best 权重：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.pt</code></li><li>Arm A area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_area_ap.csv</code></li><li>Arm B area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_area_ap.csv</code></li><li>Arm A ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.onnx</code></li><li>Arm B ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.onnx</code></li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">18</span> DINOv3 target alignment audit：缓存 target 与 GT 空间对齐</div><div class="section-body"><div class="sub-section"><h3>实验目的</h3>
+<p>第 17 节 target-focus screening 显示，<code>small_gt_weighted_soft</code> 和 <code>peak_ignore_aware</code> 都没有提升 small AP。为了判断问题是否来自 teacher objectness target 本身，本轮不训练模型，而是审计训练缓存中的 tiled local-contrast target 与 GT box 的空间对齐关系。</p>
+<p>核心问题：DINOv3 tiled local-contrast target 的高响应区域，是否真的落在小目标附近；小目标中心和框内响应，是否足够稳定地高于背景。</p>
+</div>
+<div class="sub-section"><h3>配置</h3>
+<ul><li>数据：VisDrone train split 中已存在训练缓存的图片，随机采样 300 张。</li><li>teacher target：DINOv3 ViT-B/16 tiled local-contrast objectness。</li><li>cache：<code>runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960</code>。</li><li>target 尺寸：<code>120x120</code>，对应 960 输入下 student layer 16 的辅助监督分辨率。</li><li>tile 参数：<code>tile_size=480</code>、<code>tile_stride=240</code>、<code>teacher_image_size=448</code>。</li><li>分组阈值：small <code>area &lt;= 32^2</code>，medium <code>32^2 &lt; area &lt;= 96^2</code>，large <code>area &gt; 96^2</code>。</li></ul>
+</div>
+<div class="sub-section"><h3>可复现步骤</h3>
+<pre><code class="language-bash">python scripts/audit_dinov3_target_alignment.py \
+  --dataset configs/datasets/visdrone.yaml \
+  --split train \
+  --samples 300 \
+  --seed 42 \
+  --method local_contrast \
+  --teacher-image-size 448 \
+  --tile-size 480 \
+  --tile-stride 240 \
+  --target-height 120 \
+  --target-width 120 \
+  --cache runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960 \
+  --overlay-count 32 \
+  --output runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300</code></pre>
+<p>输出：</p>
+<ul><li><code>summary.csv</code>：总体统计。</li><li><code>box_alignment.csv</code>：逐 GT box 的 center/mean/max/p90 响应与 top quantile 命中。</li><li><code>image_alignment.csv</code>：逐图 top-q 高响应区域落在 GT、小目标 GT、背景的比例。</li><li><code>overlays/*.jpg</code>：heatmap 与 GT box overlay，红色为 small，黄色为 medium，青色为 large。</li></ul>
+</div>
+<div class="sub-section"><h3>结果</h3>
+<div class="table-wrap"><table><thead><tr><th>指标</th><th>值</th></tr></thead><tbody><tr><td>images</td><td>300</td></tr><tr><td>boxes</td><td>15725</td></tr><tr><td>small_boxes</td><td>9721</td></tr><tr><td>small_center_mean</td><td>0.189195</td></tr><tr><td>small_box_mean</td><td>0.189172</td></tr><tr><td>small_box_max_mean</td><td>0.258480</td></tr><tr><td>small_center_percentile_mean</td><td>0.517120</td></tr><tr><td>small_hit_q85</td><td>0.305730</td></tr><tr><td>small_hit_q90</td><td>0.232281</td></tr><tr><td>medium_boxes</td><td>5088</td></tr><tr><td>medium_center_mean</td><td>0.198804</td></tr><tr><td>medium_box_max_mean</td><td>0.369515</td></tr><tr><td>medium_hit_q85</td><td>0.552476</td></tr><tr><td>medium_hit_q90</td><td>0.459906</td></tr><tr><td>large_boxes</td><td>916</td></tr><tr><td>large_center_mean</td><td>0.201824</td></tr><tr><td>large_box_max_mean</td><td>0.532031</td></tr><tr><td>large_hit_q85</td><td>0.818777</td></tr><tr><td>large_hit_q90</td><td>0.760917</td></tr><tr><td>q85_gt_overlap</td><td>0.100151</td></tr><tr><td>q85_small_overlap</td><td>0.016612</td></tr><tr><td>q85_false_positive</td><td>0.899849</td></tr><tr><td>q90_gt_overlap</td><td>0.099932</td></tr><tr><td>q90_small_overlap</td><td>0.016340</td></tr><tr><td>q90_false_positive</td><td>0.900068</td></tr><tr><td>foreground_mean</td><td>0.195104</td></tr><tr><td>background_mean</td><td>0.184686</td></tr></tbody></table></div>
+</div>
+<div class="sub-section"><h3>分析</h3>
+<ul><li>高响应区域和 GT 的对齐很弱：top 15% 高响应中只有约 10.0% 落在任意 GT 内，约 90.0% 落在 GT 外；top 10% 高响应也几乎相同。</li><li>对小目标尤其弱：top 15% 高响应中只有约 1.66% 落在 small GT 区域；top 10% 中只有约 1.63%。这解释了为什么 <code>small_gt_weighted_soft</code> 没有带来 small AP 提升：teacher target 的高响应主体并不在小目标上。</li><li>响应随目标面积显著增大：small box 的 <code>hit_q85=0.3057</code>，medium 为 <code>0.5525</code>，large 为 <code>0.8188</code>。DINO local-contrast target 更容易覆盖中大目标结构，而不是密集小目标。</li><li>小目标中心响应接近随机中位：<code>small_center_percentile_mean=0.5171</code>，说明小目标中心并没有稳定处于高响应区。直接让 YOLO 学这个 dense map，会把大量梯度分配给背景纹理/道路边缘/大结构。</li><li>foreground/background 均值差很小：GT 内均值 <code>0.1951</code>，背景均值 <code>0.1847</code>，差值只有约 <code>0.0104</code>。这说明当前 target 在 dense 层面不是强 foreground/background 分离信号。</li></ul>
+</div>
+<div class="sub-section"><h3>结论</h3>
+<p>本轮审计支持第 17 节的负向结论：问题不主要是 <code>lambda</code>，也不只是是否给 small GT 更高 loss weight，而是 teacher objectness target 自身对小目标的空间对齐不足。下一步不应继续训练 <code>small_gt_weighted_soft</code> 或 <code>peak_ignore_aware</code> 多 seed；应先改 target 生成方式。</p>
+<p>优先方向：从 full-image dense local-contrast 改为 small-object crop/tile mining。具体做法是在训练 batch 中围绕 small GT 或高密度小目标区域裁 crop，让 DINO 在局部上下文内产生 objectness target，再把该 target 投回 student feature map。这样目标不是“全图哪里局部纹理显著”，而是“局部小目标上下文中哪些 patch 更像实例区域”。</p>
+</div>
+<div class="sub-section"><h3>产物路径</h3>
+<ul><li>审计脚本：<code>scripts/audit_dinov3_target_alignment.py</code></li><li>远程/本地输出目录：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300</code></li><li>summary：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/summary.csv</code></li><li>逐框统计：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/box_alignment.csv</code></li><li>逐图统计：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/image_alignment.csv</code></li><li>overlay：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/overlays/</code></li><li>日志：<code>runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log</code></li></ul>
+</div></div></section><section class="section"><div class="section-header"><span class="section-number">19</span> 总体结论</div><div class="section-body"><ul><li>DINOv3 target alignment audit 进一步证明，当前 tiled local-contrast target 的高响应区域约 90% 落在 GT 外，top-q 高响应落在 small GT 的比例只有约 1.6%；small box 的 q85 命中率仅 0.3057，明显低于 medium 的 0.5525 和 large 的 0.8188。因此 small AP 无法提升的关键原因是 teacher target 对小目标空间对齐不足，而不是单纯 loss 权重不足。</li><li>小目标定向 target-focus screening 显示，<code>small_gt_weighted_soft</code> 的 overall mAP50-95=0.1455 略高于 baseline，但 small AP50-95=0.1157，低于 baseline；<code>peak_ignore_aware</code> 的 overall 和 small AP 均未达标。因此本轮不应补多 seed，应转入 target 审计，重点检查 DINO local-contrast target 对小目标中心、边缘纹理和道路背景的响应分布。</li><li>提高标签预算和提高输入分辨率都能稳定提升 VisDrone 检测，尤其对小目标更明显。</li><li>DINOv3 global 与全图 patch 蒸馏收益不稳定，全图 patch 甚至降低 small AP。</li><li>region-aware patch 蒸馏小幅提升 overall mAP50-95 与 small AP50-95，是当前直接特征蒸馏中最好的设置，但提升仍是边缘级别。</li><li>DINOv3 relation distillation 在 10%/960 上只带来 +0.0004 mAP50-95 的边缘提升；分面积统计显示收益来自 medium object，小目标 AP50-95 微降，因此暂不能证明其实现了“小目标看世界”能力迁移。</li><li>DINOv3 weak objectness auxiliary lambda=0.05 在 10%/960 上达到 mAP50-95=0.1471，是当前少标签 960 设置下最好结果；small AP50-95 小幅提升 +0.0011，但主要收益仍来自 large object。</li><li>DINOv3 weak objectness auxiliary lambda 扫描显示，普通 soft target 的 <code>lambda=0.02</code> 在 seed42 上达到 mAP50-95=0.1479，是当前最强单次结果；补充三 seed后 mean mAP50-95=0.1467，std=0.0008，高于 baseline、普通 aux <code>lambda=0.05</code> 与 ignore-aware <code>lambda=0.05</code> 三 seed 均值。</li><li>但 <code>soft lambda=0.02</code> 的 small AP50-95 mean=0.1158，略低于 baseline_10pct_960 的 0.1160；其总体收益主要来自 medium/large，因此它不是“小目标能力迁移”问题的充分答案。</li><li>第一轮 DINOv3 objectness 审计显示，全图 patch 显著性更偏道路/场景结构，不足以直接作为小目标 objectness 监督。</li><li>第二轮局部 objectness 审计显示，local contrast/residual 明显提高 GT 与小目标覆盖率，说明 DINOv3 patch token 的局部差异比全局显著性更接近实例级目标性。</li><li>第三轮 tiled local contrast 进一步将 small_top20_recall 提升到 0.8352，是当前最强的无标注 objectness teacher signal。</li><li>但是，第 12-13 节训练实验表明：把 tiled local_contrast 作为纯 objectness pretrain 密集监督后，所有 10%/960 fine-tune 结果均低于 baseline；最佳消融 mAP50-95=0.1338，仍低于 baseline=0.1444。</li><li>因此当前结论是：DINOv3 确实能提供类别无关局部显著性，但“纯 objectness pretrain -&gt; 监督微调”的桥接方式会产生负迁移；检测任务主导、低权重的 weak objectness auxiliary 是目前更可靠的桥接方式，其中 <code>soft lambda=0.02</code> 是当前最稳的 overall mAP 候选，但还没有解决 small object AP。下一步应把重点从继续调 lambda 转向“让 teacher objectness 更聚焦小目标”的目标构造与对齐策略。</li></ul></div></section><section class="section"><div class="section-header"><span class="section-number">20</span> 下一步计划</div><div class="section-body"><ol><li>停止继续扩大纯 objectness pretrain 网格，不再单独尝试更长 epoch 或更大 lambda。</li><li>暂停继续扩大 lambda 网格；<code>soft lambda=0.02</code> 可保留为 overall mAP 主候选，但不能作为小目标路线的最终证据。</li><li>基于 target alignment audit，下一轮训练优先改 target 生成方式：从 full-image dense local-contrast 转向 small-object crop/tile mining，再投回 student feature map。</li><li>设计两个 seed42 screening arm：A）small-GT crop objectness auxiliary；B）high-density-small-object tile objectness auxiliary。两者都保持 <code>lambda=0.02</code>、<code>imgsz=960</code>、<code>epochs=120</code>、<code>student_layer=16</code>，先只看 small AP50-95 是否超过 0.1170 且 overall 不低于 baseline。</li><li>若 crop/tile mining 任一 arm 达标，再补 <code>seed=2026</code>、<code>seed=3407</code>；若仍不达标，再做 layer 16/19/multi-layer 消融，确认是不是辅助层级不匹配。</li><li>继续保持 clean-weight 与 ONNX 导出作为每个候选配置的必检项，确保部署链路始终是 YOLO-only。</li></ol></div></section><section class="section"><div class="section-header"><span class="section-number">21</span> 文件索引</div><div class="section-body"><ul><li>DINOv3 target alignment audit 脚本：<code>scripts/audit_dinov3_target_alignment.py</code></li><li>DINOv3 target alignment audit 输出：<code>runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300</code></li><li>DINOv3 target alignment audit 日志：<code>runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log</code></li><li>主报告 Markdown：<code>runs/reports/visdrone_yolo26n_experiment_report.md</code></li><li>主报告 HTML：<code>runs/reports/visdrone_yolo26n_experiment_report.html</code></li><li>全部实验指标：<code>runs/reports/tables/all_experiments_summary.csv</code></li><li>全部面积 AP：<code>runs/reports/tables/all_area_ap_summary.csv</code></li><li>分辨率对比：<code>runs/reports/tables/imgsz_comparison.csv</code></li><li>objectness 预训练消融汇总：<code>runs/reports/tables/objectness_pretrain_ablation_summary.csv</code></li><li>objectness 可复现索引：<code>runs/reports/tables/objectness_reproducibility_index.csv</code></li><li>10%/960 baseline 本地产物：<code>runs/baselines/yolo26n_visdrone_10pct_imgsz960</code></li><li>10%/960 baseline 面积分组 AP：<code>runs/baselines/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_best_area_ap.csv</code></li><li>DINOv3 relation 配置：<code>configs/experiments/dinov3_relation_distill_visdrone_10pct_imgsz960.yaml</code></li><li>DINOv3 relation 训练脚本：<code>scripts/train_dinov3_relation_distill.py</code></li><li>DINOv3 relation 结果目录：<code>runs/dinov3_distill/yolo26n_visdrone_10pct_imgsz960_dinov3_relation</code></li><li>DINOv3 relation 面积分组 AP：<code>runs/dinov3_distill/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_relation_best_area_ap.csv</code></li><li>DINOv3 weak objectness auxiliary 配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml</code></li><li>DINOv3 weak objectness auxiliary 训练脚本：<code>scripts/train_dinov3_objectness_aux.py</code></li><li>DINOv3 weak objectness auxiliary 结果目录：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005</code></li><li>DINOv3 weak objectness auxiliary 面积分组 AP：<code>runs/dinov3_objectness/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_best_area_ap.csv</code></li><li>DINOv3 weak objectness auxiliary ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam005_onnx.log</code></li><li>DINOv3 objectness auxiliary lambda 扫描配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam010_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_ignore_aware_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_ignore_aware_visdrone_10pct_imgsz960_lam010_seed42.yaml</code></li><li>DINOv3 objectness auxiliary lambda 扫描日志：<code>runs/dinov3_objectness/logs/objaux_lambda_scan_seed42_queue.log</code></li><li>DINOv3 objectness auxiliary lambda=0.02 多 seed 配置：<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed2026.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam002_seed3407.yaml</code></li><li>DINOv3 objectness auxiliary lambda=0.02 多 seed 日志：<code>runs/dinov3_objectness/logs/objaux_lam002_multiseed_queue.log</code></li><li>DINOv3 objectness auxiliary lambda=0.02 area AP：<code>runs/dinov3_objectness/reports/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42_best_area_ap.csv</code>、<code>...seed2026_best_area_ap.csv</code>、<code>...seed3407_best_area_ap.csv</code></li><li>DINOv3 objectness auxiliary lambda=0.02 ONNX：<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_lam002_seed42/weights/best.onnx</code>、<code>...seed2026/weights/best.onnx</code>、<code>...seed3407/weights/best.onnx</code></li><li>DINOv3 objectness auxiliary lambda=0.02 评估导出队列日志：<code>runs/dinov3_objectness/logs/objaux_lam002_eval_export_queue.log</code></li><li>DINOv3 objectness target-focus 配置：<code>configs/experiments/dinov3_objectness_aux_smallgt_visdrone_10pct_imgsz960_lam002_seed42.yaml</code>、<code>configs/experiments/dinov3_objectness_aux_peak_visdrone_10pct_imgsz960_lam002_seed42.yaml</code></li><li>DINOv3 objectness target-focus area AP：<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_area_ap.csv</code>、<code>runs/dinov3_objectness/area_ap/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_area_ap.csv</code></li><li>DINOv3 objectness target-focus ONNX 导出日志：<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42_clean_load_onnx.log</code>、<code>runs/dinov3_objectness/export_logs/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42_clean_load_onnx.log</code></li><li>objectness 主实验：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objectness_pretrain</code>、<code>runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objectness_pretrain_ft</code></li><li>objectness 定位消融：<code>runs/dinov3_objectness/yolo26n_visdrone_full_imgsz960_dinov3_objpre_lam010_ep5</code>、<code>..._lam010_ep10</code>、<code>..._lam025_ep5</code> 及对应 <code>_ft</code> 微调目录</li><li>objectness 日志：<code>runs/dinov3_objectness/logs/yolo26n_objectness_pretrain_ft_10pct960.log</code>、<code>runs/dinov3_objectness/logs/objectness_ablation_queue.log</code></li><li>第一轮 objectness 审计：<code>runs/dinov3_objectness/audit_train300_448</code></li><li>第二轮 objectness 审计：<code>runs/dinov3_objectness/audit_train300_448_local_contrast</code>、<code>audit_train300_448_local_residual</code>、<code>audit_train300_448_local_fusion</code></li><li>第三轮 tiled objectness 审计：<code>runs/dinov3_objectness/audit_train300_448_tiled_local_contrast_t480_s240</code></li></ul></div></section>
+<div class="report-footer">Generated from Markdown source. Local runs artifacts are intentionally not committed.</div>
 </div>
 </body>
 </html>

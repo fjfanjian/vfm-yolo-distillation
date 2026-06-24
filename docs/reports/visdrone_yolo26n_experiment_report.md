@@ -931,8 +931,108 @@ Arm B 使用相同命令，仅替换模型目录和 `--name`。
 - Arm A ONNX：`runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallgt_lam002_seed42/weights/best.onnx`
 - Arm B ONNX：`runs/dinov3_objectness/yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_peak_lam002_seed42/weights/best.onnx`
 
-## 18. 总体结论
+## 18. DINOv3 target alignment audit：缓存 target 与 GT 空间对齐
 
+### 实验目的
+
+第 17 节 target-focus screening 显示，`small_gt_weighted_soft` 和 `peak_ignore_aware` 都没有提升 small AP。为了判断问题是否来自 teacher objectness target 本身，本轮不训练模型，而是审计训练缓存中的 tiled local-contrast target 与 GT box 的空间对齐关系。
+
+核心问题：DINOv3 tiled local-contrast target 的高响应区域，是否真的落在小目标附近；小目标中心和框内响应，是否足够稳定地高于背景。
+
+### 配置
+
+- 数据：VisDrone train split 中已存在训练缓存的图片，随机采样 300 张。
+- teacher target：DINOv3 ViT-B/16 tiled local-contrast objectness。
+- cache：`runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960`。
+- target 尺寸：`120x120`，对应 960 输入下 student layer 16 的辅助监督分辨率。
+- tile 参数：`tile_size=480`、`tile_stride=240`、`teacher_image_size=448`。
+- 分组阈值：small `area <= 32^2`，medium `32^2 < area <= 96^2`，large `area > 96^2`。
+
+### 可复现步骤
+
+```bash
+python scripts/audit_dinov3_target_alignment.py \
+  --dataset configs/datasets/visdrone.yaml \
+  --split train \
+  --samples 300 \
+  --seed 42 \
+  --method local_contrast \
+  --teacher-image-size 448 \
+  --tile-size 480 \
+  --tile-stride 240 \
+  --target-height 120 \
+  --target-width 120 \
+  --cache runs/dinov3_objectness/cache/tiled_local_contrast_t480_s240_l16_imgsz960 \
+  --overlay-count 32 \
+  --output runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300
+```
+
+输出：
+
+- `summary.csv`：总体统计。
+- `box_alignment.csv`：逐 GT box 的 center/mean/max/p90 响应与 top quantile 命中。
+- `image_alignment.csv`：逐图 top-q 高响应区域落在 GT、小目标 GT、背景的比例。
+- `overlays/*.jpg`：heatmap 与 GT box overlay，红色为 small，黄色为 medium，青色为 large。
+
+### 结果
+
+| 指标 | 值 |
+| --- | --- |
+| images | 300 |
+| boxes | 15725 |
+| small_boxes | 9721 |
+| small_center_mean | 0.189195 |
+| small_box_mean | 0.189172 |
+| small_box_max_mean | 0.258480 |
+| small_center_percentile_mean | 0.517120 |
+| small_hit_q85 | 0.305730 |
+| small_hit_q90 | 0.232281 |
+| medium_boxes | 5088 |
+| medium_center_mean | 0.198804 |
+| medium_box_max_mean | 0.369515 |
+| medium_hit_q85 | 0.552476 |
+| medium_hit_q90 | 0.459906 |
+| large_boxes | 916 |
+| large_center_mean | 0.201824 |
+| large_box_max_mean | 0.532031 |
+| large_hit_q85 | 0.818777 |
+| large_hit_q90 | 0.760917 |
+| q85_gt_overlap | 0.100151 |
+| q85_small_overlap | 0.016612 |
+| q85_false_positive | 0.899849 |
+| q90_gt_overlap | 0.099932 |
+| q90_small_overlap | 0.016340 |
+| q90_false_positive | 0.900068 |
+| foreground_mean | 0.195104 |
+| background_mean | 0.184686 |
+
+### 分析
+
+- 高响应区域和 GT 的对齐很弱：top 15% 高响应中只有约 10.0% 落在任意 GT 内，约 90.0% 落在 GT 外；top 10% 高响应也几乎相同。
+- 对小目标尤其弱：top 15% 高响应中只有约 1.66% 落在 small GT 区域；top 10% 中只有约 1.63%。这解释了为什么 `small_gt_weighted_soft` 没有带来 small AP 提升：teacher target 的高响应主体并不在小目标上。
+- 响应随目标面积显著增大：small box 的 `hit_q85=0.3057`，medium 为 `0.5525`，large 为 `0.8188`。DINO local-contrast target 更容易覆盖中大目标结构，而不是密集小目标。
+- 小目标中心响应接近随机中位：`small_center_percentile_mean=0.5171`，说明小目标中心并没有稳定处于高响应区。直接让 YOLO 学这个 dense map，会把大量梯度分配给背景纹理/道路边缘/大结构。
+- foreground/background 均值差很小：GT 内均值 `0.1951`，背景均值 `0.1847`，差值只有约 `0.0104`。这说明当前 target 在 dense 层面不是强 foreground/background 分离信号。
+
+### 结论
+
+本轮审计支持第 17 节的负向结论：问题不主要是 `lambda`，也不只是是否给 small GT 更高 loss weight，而是 teacher objectness target 自身对小目标的空间对齐不足。下一步不应继续训练 `small_gt_weighted_soft` 或 `peak_ignore_aware` 多 seed；应先改 target 生成方式。
+
+优先方向：从 full-image dense local-contrast 改为 small-object crop/tile mining。具体做法是在训练 batch 中围绕 small GT 或高密度小目标区域裁 crop，让 DINO 在局部上下文内产生 objectness target，再把该 target 投回 student feature map。这样目标不是“全图哪里局部纹理显著”，而是“局部小目标上下文中哪些 patch 更像实例区域”。
+
+### 产物路径
+
+- 审计脚本：`scripts/audit_dinov3_target_alignment.py`
+- 远程/本地输出目录：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300`
+- summary：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/summary.csv`
+- 逐框统计：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/box_alignment.csv`
+- 逐图统计：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/image_alignment.csv`
+- overlay：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300/overlays/`
+- 日志：`runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log`
+
+## 19. 总体结论
+
+- DINOv3 target alignment audit 进一步证明，当前 tiled local-contrast target 的高响应区域约 90% 落在 GT 外，top-q 高响应落在 small GT 的比例只有约 1.6%；small box 的 q85 命中率仅 0.3057，明显低于 medium 的 0.5525 和 large 的 0.8188。因此 small AP 无法提升的关键原因是 teacher target 对小目标空间对齐不足，而不是单纯 loss 权重不足。
 - 小目标定向 target-focus screening 显示，`small_gt_weighted_soft` 的 overall mAP50-95=0.1455 略高于 baseline，但 small AP50-95=0.1157，低于 baseline；`peak_ignore_aware` 的 overall 和 small AP 均未达标。因此本轮不应补多 seed，应转入 target 审计，重点检查 DINO local-contrast target 对小目标中心、边缘纹理和道路背景的响应分布。
 - 提高标签预算和提高输入分辨率都能稳定提升 VisDrone 检测，尤其对小目标更明显。
 - DINOv3 global 与全图 patch 蒸馏收益不稳定，全图 patch 甚至降低 small AP。
@@ -947,17 +1047,20 @@ Arm B 使用相同命令，仅替换模型目录和 `--name`。
 - 但是，第 12-13 节训练实验表明：把 tiled local_contrast 作为纯 objectness pretrain 密集监督后，所有 10%/960 fine-tune 结果均低于 baseline；最佳消融 mAP50-95=0.1338，仍低于 baseline=0.1444。
 - 因此当前结论是：DINOv3 确实能提供类别无关局部显著性，但“纯 objectness pretrain -> 监督微调”的桥接方式会产生负迁移；检测任务主导、低权重的 weak objectness auxiliary 是目前更可靠的桥接方式，其中 `soft lambda=0.02` 是当前最稳的 overall mAP 候选，但还没有解决 small object AP。下一步应把重点从继续调 lambda 转向“让 teacher objectness 更聚焦小目标”的目标构造与对齐策略。
 
-## 19. 下一步计划
+## 20. 下一步计划
 
 1. 停止继续扩大纯 objectness pretrain 网格，不再单独尝试更长 epoch 或更大 lambda。
 2. 暂停继续扩大 lambda 网格；`soft lambda=0.02` 可保留为 overall mAP 主候选，但不能作为小目标路线的最终证据。
-3. 基于 target-focus screening 的负向结果，重新审计 tiled local-contrast target 与 GT 小目标的空间对齐，重点分析 false positive 道路/背景区域、小目标中心低响应区域，以及 peak-only 策略为何损失密集小目标信号。
-4. 设计更偏小目标的 objectness target：例如 GT-size-aware weighting、small-object crop/tile mining、仅在高局部对比且非大面积区域上施加辅助约束。
-5. 比较 layer 16、layer 19 与 multi-layer auxiliary 的差异，确认 small AP 无提升是否来自辅助约束层级不匹配。
+3. 基于 target alignment audit，下一轮训练优先改 target 生成方式：从 full-image dense local-contrast 转向 small-object crop/tile mining，再投回 student feature map。
+4. 设计两个 seed42 screening arm：A）small-GT crop objectness auxiliary；B）high-density-small-object tile objectness auxiliary。两者都保持 `lambda=0.02`、`imgsz=960`、`epochs=120`、`student_layer=16`，先只看 small AP50-95 是否超过 0.1170 且 overall 不低于 baseline。
+5. 若 crop/tile mining 任一 arm 达标，再补 `seed=2026`、`seed=3407`；若仍不达标，再做 layer 16/19/multi-layer 消融，确认是不是辅助层级不匹配。
 6. 继续保持 clean-weight 与 ONNX 导出作为每个候选配置的必检项，确保部署链路始终是 YOLO-only。
 
-## 20. 文件索引
+## 21. 文件索引
 
+- DINOv3 target alignment audit 脚本：`scripts/audit_dinov3_target_alignment.py`
+- DINOv3 target alignment audit 输出：`runs/dinov3_objectness/audit_target_alignment_cache_t480_s240_300`
+- DINOv3 target alignment audit 日志：`runs/dinov3_objectness/logs/target_alignment_cache_t480_s240_300.log`
 - 主报告 Markdown：`runs/reports/visdrone_yolo26n_experiment_report.md`
 - 主报告 HTML：`runs/reports/visdrone_yolo26n_experiment_report.html`
 - 全部实验指标：`runs/reports/tables/all_experiments_summary.csv`
