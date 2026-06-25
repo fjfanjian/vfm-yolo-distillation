@@ -107,32 +107,33 @@ def load_ground_truths(images: list[Path]) -> list[Box]:
 def collect_predictions(model_path: Path, images: list[Path], imgsz: int, conf: float, iou: float, max_det: int) -> list[Box]:
     model = YOLO(str(model_path))
     predictions: list[Box] = []
-    stream = model.predict(
-        source=[str(path) for path in images],
-        imgsz=imgsz,
-        conf=conf,
-        iou=iou,
-        max_det=max_det,
-        device=0,
-        batch=1,
-        verbose=False,
-        stream=True,
-    )
-    for result in stream:
-        image_id = Path(result.path).stem
-        for box in result.boxes:
-            xyxy_values = tuple(float(value) for value in box.xyxy[0].tolist())
-            width = max(0.0, xyxy_values[2] - xyxy_values[0])
-            height = max(0.0, xyxy_values[3] - xyxy_values[1])
-            predictions.append(
-                Box(
-                    image_id=image_id,
-                    class_id=int(box.cls[0]),
-                    xyxy=xyxy_values,
-                    area=width * height,
-                    score=float(box.conf[0]),
+    for image_path in images:
+        stream = model.predict(
+            source=str(image_path),
+            imgsz=imgsz,
+            conf=conf,
+            iou=iou,
+            max_det=max_det,
+            device=0,
+            batch=1,
+            verbose=False,
+            stream=True,
+        )
+        for result in stream:
+            image_id = Path(result.path).stem
+            for box in result.boxes:
+                xyxy_values = tuple(float(value) for value in box.xyxy[0].tolist())
+                width = max(0.0, xyxy_values[2] - xyxy_values[0])
+                height = max(0.0, xyxy_values[3] - xyxy_values[1])
+                predictions.append(
+                    Box(
+                        image_id=image_id,
+                        class_id=int(box.cls[0]),
+                        xyxy=xyxy_values,
+                        area=width * height,
+                        score=float(box.conf[0]),
+                    )
                 )
-            )
     return predictions
 
 
