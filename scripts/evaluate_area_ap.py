@@ -114,6 +114,7 @@ def collect_predictions(model_path: Path, images: list[Path], imgsz: int, conf: 
         iou=iou,
         max_det=max_det,
         device=0,
+        batch=1,
         verbose=False,
         stream=True,
     )
