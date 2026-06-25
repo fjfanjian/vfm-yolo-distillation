@@ -133,15 +133,17 @@ class DinoObjectnessPretrainTrainer(DetectionTrainer):
 
     def _teacher_tokens(self, crops: torch.Tensor) -> torch.Tensor:
         settings = self.objectness_settings
-        mean, std = self._teacher_norm(crops.device, crops.dtype)
+        teacher_dtype = torch.float32
+        mean, std = self._teacher_norm(crops.device, teacher_dtype)
         resized = F.interpolate(
-            crops,
+            crops.to(dtype=teacher_dtype),
             size=(settings.teacher_image_size, settings.teacher_image_size),
             mode="bilinear",
             align_corners=False,
         )
-        with torch.no_grad():
-            features = self._load_teacher(crops.device).forward_features((resized - mean) / std)
+        teacher_inputs = (resized - mean) / std
+        with torch.no_grad(), torch.amp.autocast(device_type=crops.device.type, enabled=False):
+            features = self._load_teacher(crops.device).forward_features(teacher_inputs)
         if not isinstance(features, dict) or "x_norm_patchtokens" not in features:
             raise ConfigError("DINOv3 teacher did not return x_norm_patchtokens")
         tokens = features["x_norm_patchtokens"]
