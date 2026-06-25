@@ -1,0 +1,45 @@
+name: yolo26n_dinov3_objectness_aux_smalltile_visdrone_10pct_imgsz960_lam002_l19_seed42
+stage: objectness_auxiliary
+description: YOLO26n 10% VisDrone 960 supervised training with high-density small-object tile DINOv3 local-contrast objectness auxiliary loss, lambda 0.02, student layer 19, seed 42.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 960
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/featurize/vfm-yolo-distillation/runs/dinov3_objectness
+  name: yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smalltile_l19_lam002_seed42
+metrics:
+  - mAP50-95
+  - mAP50
+  - AP_small
+  - dino_objectness_loss
+objectness:
+  teacher_repo: /home/featurize/work/dinov3
+  teacher_weights: /home/featurize/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 448
+  teacher_patch_grid: 28
+  teacher_batch: 16
+  method: local_contrast
+  tile_size: 480
+  tile_stride: 240
+  student_layer: 19
+  student_dim: 128
+  lambda_objectness: 0.02
+  target_mode: small_tile_soft
+  small_area_px: 1024
+  density_tile_size: 480
+  density_tile_stride: 240
+  max_tiles_per_image: 4
+  min_small_boxes_per_tile: 3
+  tile_weight: 1.0
+  cache: /home/featurize/vfm-yolo-distillation/runs/dinov3_objectness/cache/smalltile_local_contrast_t480_s240_l19_imgsz960
