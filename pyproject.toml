@@ -38,6 +38,33 @@ ignore = [
     "D213",
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"scripts/train_dinov3_objectness_aux.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D107",
+    "FBT001",
+    "FBT002",
+]
+"scripts/train_dinov3_objectness_aux_multilayer.py" = [
+    "D100",
+    "D101",
+    "D102",
+    "D103",
+    "D107",
+    "FBT001",
+    "FBT002",
+    "SLF001",
+]
+"src/vfm_yolo_distillation/objectness_multilayer.py" = [
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+]
+
 [tool.pytest.ini_options]
 pythonpath = ["src", "."]
 
