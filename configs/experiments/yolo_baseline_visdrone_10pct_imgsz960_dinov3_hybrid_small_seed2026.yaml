@@ -1,0 +1,28 @@
+name: yolo26n_baseline_visdrone_10pct_imgsz960_dinov3_hybrid_small_seed2026
+stage: supervised_baseline
+description: YOLO26n baseline on a DINOv3 coverage plus small-object-aware hybrid 10% VisDrone subset at imgsz=960.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone_10pct_dinov3_hybrid_small_seed2026.yaml
+  label_budget: full
+training:
+  image_size: 960
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 2026
+outputs:
+  project: /home/fj/vfm-yolo-distillation/runs/baselines
+  name: yolo26n_visdrone_10pct_imgsz960_dinov3_hybrid_small_seed2026
+metrics:
+  - mAP50-95
+  - mAP50
+  - mAP75
+  - AP_small
+  - AR_small
+  - fps
+  - params
+  - flops
