@@ -1,0 +1,15 @@
+path: /home/fj/datasets/visdrone
+train: splits/visdrone/train_10pct_small_object_topk.txt
+val: VisDrone2019-DET-val/images
+test: VisDrone2019-DET-test-dev/images
+names:
+  - pedestrian
+  - people
+  - bicycle
+  - car
+  - van
+  - truck
+  - tricycle
+  - awning-tricycle
+  - bus
+  - motor
