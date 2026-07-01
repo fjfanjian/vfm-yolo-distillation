@@ -51,9 +51,13 @@ def _parse_args() -> argparse.Namespace:
 
 def _collect_images(dataset_root: Path, image_list: str | None, limit: int) -> tuple[Path, ...]:
     if image_list:
-        paths = tuple(Path(line.strip()) for line in Path(image_list).read_text(encoding="utf-8").splitlines() if line.strip())
+        paths = tuple(
+            Path(line.strip()).resolve()
+            for line in Path(image_list).read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        )
     else:
-        paths = tuple(sorted((dataset_root / "VisDrone2019-DET-train" / "images").glob("*.jpg")))
+        paths = tuple(sorted(path.resolve() for path in (dataset_root / "VisDrone2019-DET-train" / "images").glob("*.jpg")))
     return paths[:limit] if limit > 0 else paths
 
 
@@ -77,7 +81,7 @@ def _predict_boxes(args: argparse.Namespace, images: tuple[Path, ...]) -> tuple[
         )
         for result in stream:
             height, width = (int(value) for value in result.orig_shape)
-            image_path = Path(str(result.path)).as_posix()
+            image_path = Path(str(result.path)).resolve().as_posix()
             if result.boxes is None:
                 continue
             for prediction in result.boxes:
@@ -100,9 +104,9 @@ def _predict_boxes(args: argparse.Namespace, images: tuple[Path, ...]) -> tuple[
 def _score_images(images: tuple[Path, ...], boxes: tuple[PseudoBox, ...], settings: ScoreSettings) -> tuple[ImageScore, ...]:
     boxes_by_image: dict[str, list[PseudoBox]] = defaultdict(list)
     for box in boxes:
-        boxes_by_image[box.image].append(box)
+        boxes_by_image[Path(box.image).resolve().as_posix()].append(box)
     return tuple(
-        score_image(image.as_posix(), boxes_by_image.get(image.as_posix(), []), settings)
+        score_image(image.as_posix(), boxes_by_image.get(image.resolve().as_posix(), []), settings)
         for image in images
     )
 
@@ -116,14 +120,20 @@ def _draw_visualizations(
 ) -> None:
     boxes_by_image: dict[str, list[PseudoBox]] = defaultdict(list)
     for box in boxes:
-        boxes_by_image[box.image].append(box)
+        boxes_by_image[Path(box.image).resolve().as_posix()].append(box)
     image_items: list[tuple[str, str, str]] = []
     viz_dir = output_dir / "visualizations"
     viz_dir.mkdir(parents=True, exist_ok=True)
     for rank, score in enumerate(scores, start=1):
         image_path = Path(score.image)
         output_path = viz_dir / f"{rank:03d}_{image_path.stem}.jpg"
-        _draw_one(image_path, boxes_by_image.get(score.image, []), output_path, settings, max_boxes_per_image)
+        _draw_one(
+            image_path,
+            boxes_by_image.get(image_path.resolve().as_posix(), []),
+            output_path,
+            settings,
+            max_boxes_per_image,
+        )
         image_items.append((output_path.name, image_path.name, f"score={score.score:.2f}, small={score.small_boxes}, boxes={score.pseudo_boxes}"))
     _write_gallery(output_dir / "index.html", image_items)
 
