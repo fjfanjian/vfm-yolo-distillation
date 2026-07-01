@@ -44,6 +44,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--box-score-mode", choices=("count", "confidence"), default="count")
     parser.add_argument("--visualize-count", type=int, default=24)
     parser.add_argument("--max-boxes-per-image", type=int, default=160)
+    parser.add_argument("--predict-batch-size", type=int, default=128)
     parser.add_argument("--limit", type=int, default=0)
     return parser.parse_args()
 
@@ -61,33 +62,38 @@ def _predict_boxes(args: argparse.Namespace, images: tuple[Path, ...]) -> tuple[
 
     model = YOLO(str(args.teacher))
     boxes: list[PseudoBox] = []
-    stream = model.predict(
-        source=[path.as_posix() for path in images],
-        imgsz=args.imgsz,
-        conf=args.conf,
-        iou=args.iou,
-        max_det=args.max_det,
-        device=args.device,
-        stream=True,
-        verbose=False,
-    )
-    for result in stream:
-        height, width = (int(value) for value in result.orig_shape)
-        image_path = Path(str(result.path)).as_posix()
-        if result.boxes is None:
-            continue
-        for prediction in result.boxes:
-            x1, y1, x2, y2 = (float(value) for value in prediction.xyxy[0].tolist())
-            boxes.append(
-                PseudoBox(
-                    image=image_path,
-                    class_id=int(prediction.cls[0]),
-                    confidence=float(prediction.conf[0]),
-                    xyxy=(x1, y1, x2, y2),
-                    image_width=width,
-                    image_height=height,
+    batch_size = max(1, int(args.predict_batch_size))
+    for start in range(0, len(images), batch_size):
+        batch = images[start : start + batch_size]
+        stream = model.predict(
+            source=[path.as_posix() for path in batch],
+            imgsz=args.imgsz,
+            conf=args.conf,
+            iou=args.iou,
+            max_det=args.max_det,
+            device=args.device,
+            stream=True,
+            verbose=False,
+        )
+        for result in stream:
+            height, width = (int(value) for value in result.orig_shape)
+            image_path = Path(str(result.path)).as_posix()
+            if result.boxes is None:
+                continue
+            for prediction in result.boxes:
+                x1, y1, x2, y2 = (float(value) for value in prediction.xyxy[0].tolist())
+                boxes.append(
+                    PseudoBox(
+                        image=image_path,
+                        class_id=int(prediction.cls[0]),
+                        confidence=float(prediction.conf[0]),
+                        xyxy=(x1, y1, x2, y2),
+                        image_width=width,
+                        image_height=height,
+                    )
                 )
-            )
+        sys.stdout.write(f"predicted {min(start + batch_size, len(images))}/{len(images)} images\n")
+        sys.stdout.flush()
     return tuple(boxes)
 
 
