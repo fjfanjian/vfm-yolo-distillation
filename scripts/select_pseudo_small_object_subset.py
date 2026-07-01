@@ -79,9 +79,9 @@ def _predict_boxes(args: argparse.Namespace, images: tuple[Path, ...]) -> tuple[
             stream=True,
             verbose=False,
         )
-        for result in stream:
+        for result, source_path in zip(stream, batch, strict=True):
             height, width = (int(value) for value in result.orig_shape)
-            image_path = Path(str(result.path)).resolve().as_posix()
+            image_path = source_path.as_posix()
             if result.boxes is None:
                 continue
             for prediction in result.boxes:
