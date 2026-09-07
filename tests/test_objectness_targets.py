@@ -1,15 +1,22 @@
 # ruff: noqa: D103, INP001, S101
 import torch
 
+from vfm_yolo_distillation.background_contrast_targets import (
+    _BackgroundContrastRequest,
+    _BackgroundContrastSettings,
+    _build_background_contrast_targets,
+)
 from vfm_yolo_distillation.objectness_targets import (
     AreaThresholds,
     GtAreaMasks,
     GtAreaMaskSettings,
     PeakIgnoreSettings,
+    SmallCenterTargetSettings,
     SmallGtWeightMapSettings,
     SmallGtWeights,
     build_gt_area_masks,
     build_peak_ignore_targets,
+    build_small_center_targets,
     build_small_gt_weight_map,
 )
 
@@ -145,6 +152,92 @@ def test_small_gt_weight_map_when_gt_is_empty() -> None:
     # Then
     _assert_close(weights[0, 0, 0, 0], 0.05)
     _assert_close(weights[0, 0, 1, 1], 0.25)
+
+
+def test_small_center_targets_focus_on_small_box_centers() -> None:
+    # Given
+    batch_idx = torch.tensor([0, 0])
+    bboxes_xywhn = torch.tensor(
+        [
+            [0.55, 0.55, 0.10, 0.10],
+            [0.20, 0.20, 0.60, 0.60],
+        ]
+    )
+
+    # When
+    targets, weights = build_small_center_targets(
+        batch_idx=batch_idx,
+        bboxes_xywhn=bboxes_xywhn,
+        image_size_hw=(100, 100),
+        target_hw=(10, 10),
+        batch_size=1,
+        settings=SmallCenterTargetSettings(
+            small_area_px=200.0,
+            radius_cells=1.5,
+            sigma_cells=1.0,
+            max_centers_per_image=16,
+            weight=2.0,
+        ),
+    )
+
+    # Then
+    assert targets.max().item() > 0.85
+    _assert_close(weights.max(), 2.0)
+    _assert_close(weights[0, 0, 2, 2], 0.0)
+
+
+def test_small_center_targets_when_no_small_boxes() -> None:
+    # Given
+    batch_idx = torch.tensor([0])
+    bboxes_xywhn = torch.tensor([[0.50, 0.50, 0.80, 0.80]])
+
+    # When
+    targets, weights = build_small_center_targets(
+        batch_idx=batch_idx,
+        bboxes_xywhn=bboxes_xywhn,
+        image_size_hw=(100, 100),
+        target_hw=(10, 10),
+        batch_size=1,
+        settings=SmallCenterTargetSettings(
+            small_area_px=200.0,
+            radius_cells=1.5,
+            sigma_cells=1.0,
+            max_centers_per_image=16,
+            weight=2.0,
+        ),
+    )
+
+    # Then
+    _assert_close(targets.sum(), 0.0)
+    _assert_close(weights.sum(), 0.0)
+
+
+def test_background_contrast_targets_use_small_object_and_nearby_background() -> None:
+    # Given
+    teacher_targets = torch.zeros((1, 1, 8, 8))
+    teacher_targets[0, 0, 3:5, 3:5] = 0.8
+    request = _BackgroundContrastRequest(
+        teacher_targets=teacher_targets,
+        batch_idx=torch.tensor([0]),
+        bboxes_xywhn=torch.tensor([[0.50, 0.50, 0.20, 0.20]]),
+        image_size_hw=(100, 100),
+        settings=_BackgroundContrastSettings(
+            small_area_px=500.0,
+            ring_context_cells=1,
+            positive_weight=2.0,
+            background_weight=0.5,
+            max_boxes_per_image=16,
+        ),
+    )
+
+    # When
+    labels, weights = _build_background_contrast_targets(request)
+
+    # Then
+    _assert_close(labels[0, 0, 3, 3], 0.8)
+    _assert_close(weights[0, 0, 3, 3], 2.0)
+    _assert_close(labels[0, 0, 2, 3], 0.0)
+    _assert_close(weights[0, 0, 2, 3], 0.5)
 
 
 def _assert_close(value: torch.Tensor, expected: float) -> None:

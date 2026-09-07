@@ -1,0 +1,19 @@
+name: locateanything_quality_audit_visdrone_seed42
+source_data: configs/datasets/visdrone.yaml
+labeled_data: configs/datasets/visdrone_10pct.yaml
+dataset_root_override: /home/fj/datasets/visdrone
+output_dir: runs/locateanything_quality
+raw_output_jsonl: runs/locateanything_quality/locateanything_visdrone_10pct_seed42_raw_outputs.jsonl
+parsed_candidates_csv: runs/locateanything_quality/locateanything_visdrone_10pct_seed42_candidates.csv
+report_dir: runs/locateanything_quality/reports
+locateanything:
+  model_id: nvidia/LocateAnything-3B
+  device: cuda
+  generation_mode: hybrid
+  max_new_tokens: 2048
+  max_image_side: 1360
+  temperature: 0.1
+  top_p: 0.9
+  prompt_modes:
+    all_classes: "Locate all the instances that matches the following description: pedestrian</c>people</c>bicycle</c>car</c>van</c>truck</c>tricycle</c>awning tricycle</c>bus</c>motorcycle."
+    grouped_small_aerial: "Locate all small aerial objects that match these categories: pedestrian</c>people</c>bicycle</c>car</c>van</c>truck</c>tricycle</c>awning tricycle</c>bus</c>motorcycle."

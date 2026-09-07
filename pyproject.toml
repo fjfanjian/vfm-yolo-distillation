@@ -58,11 +58,108 @@ ignore = [
     "FBT002",
     "SLF001",
 ]
+"scripts/run_grounding_dino_pseudolabel_yolo.py" = [
+    "D101",
+    "D103",
+    "PLC0415",
+    "S603",
+    "T201",
+    "TRY003",
+]
+"scripts/run_grounding_dino_quality_pseudo.py" = [
+    "D101",
+    "D102",
+    "D103",
+    "EM101",
+    "EM102",
+    "FBT001",
+    "PLC0415",
+    "S603",
+    "T201",
+    "TRY003",
+    "TRY004",
+]
+"scripts/run_locateanything_quality_audit.py" = [
+    "ANN001",
+    "D101",
+    "D103",
+    "FBT001",
+    "PLC0415",
+    "PLR0913",
+    "S603",
+    "T201",
+    "TRY003",
+]
+"src/vfm_yolo_distillation/locateanything_quality.py" = [
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    "EM101",
+    "EM102",
+    "PLC0415",
+    "PLR0913",
+    "PLR2004",
+    "TRY003",
+]
+"src/vfm_yolo_distillation/locateanything_model_loading.py" = [
+    "ANN401",
+    "D103",
+    "FBT001",
+    "FBT002",
+    "PLC0415",
+    "SLF001",
+    "TC003",
+]
+"src/vfm_yolo_distillation/locateanything_runner.py" = [
+    "ANN001",
+    "D101",
+    "D103",
+    "FBT001",
+    "PLC0415",
+    "PLR0913",
+    "S603",
+    "T201",
+    "TRY003",
+]
 "src/vfm_yolo_distillation/objectness_multilayer.py" = [
     "D101",
     "D102",
     "D103",
     "D105",
+]
+"src/vfm_yolo_distillation/pseudo_label_quality.py" = [
+    "D101",
+    "D102",
+    "D103",
+    "D105",
+    "EM102",
+    "TRY003",
+]
+"src/vfm_yolo_distillation/pseudo_label_dataset.py" = [
+    "D101",
+    "D103",
+    "D105",
+]
+"tests/test_pseudo_label_dataset.py" = [
+    "D103",
+    "INP001",
+    "S101",
+]
+"tests/test_grounding_dino_pseudo_quality.py" = [
+    "D103",
+    "INP001",
+    "PLR2004",
+    "S101",
+    "TC003",
+]
+"tests/test_locateanything_quality.py" = [
+    "D103",
+    "FBT001",
+    "INP001",
+    "PLR2004",
+    "S101",
+    "SLF001",
 ]
 
 [tool.pytest.ini_options]

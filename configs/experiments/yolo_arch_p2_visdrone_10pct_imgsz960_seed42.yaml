@@ -1,0 +1,28 @@
+name: yolo26n_p2_visdrone_10pct_imgsz960_seed42
+stage: supervised_baseline
+description: YOLO26n P2 four-scale detection head on the 10% labeled VisDrone split at imgsz=960.
+student:
+  family: ultralytics
+  model: configs/models/yolo26n-p2.yaml
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 960
+  epochs: 120
+  batch: 12
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/fj/vfm-yolo-distillation/runs/yolo_arch
+  name: yolo26n_p2_visdrone_10pct_imgsz960_seed42
+metrics:
+  - mAP50-95
+  - mAP50
+  - mAP75
+  - AP_small
+  - AP_medium
+  - AP_large
+  - params
+  - flops

@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 import types
+from collections import OrderedDict
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -181,19 +182,23 @@ class DinoRelationDistillTrainer(DetectionTrainer):
             models.append(unwrap_model(self.ema.ema))
         saved_loss_methods = [model.__dict__.pop("loss", None) for model in models]
         saved_projectors = [model._modules.pop("dino_relation_projector", None) for model in models]
+        saved_hooks = []
         for model in models:
             layer = model.model[self.distill_settings.student_layer]
-            if hasattr(layer, "dino_student_feature"):
-                delattr(layer, "dino_student_feature")
+            saved_hooks.append(layer._forward_hooks.copy())
+            layer._forward_hooks = OrderedDict()
+            layer.__dict__.pop("dino_student_feature", None)
         try:
             return bool(super().save_model())
         finally:
-            for model, loss_method, projector in zip(
+            for model, loss_method, projector, hooks in zip(
                 models,
                 saved_loss_methods,
                 saved_projectors,
+                saved_hooks,
                 strict=True,
             ):
+                model.model[self.distill_settings.student_layer]._forward_hooks = hooks
                 if projector is not None:
                     model.add_module("dino_relation_projector", projector)
                 if loss_method is not None:

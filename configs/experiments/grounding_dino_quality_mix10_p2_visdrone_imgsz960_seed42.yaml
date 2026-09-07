@@ -1,0 +1,30 @@
+name: grounding_dino_quality_mix10_p2_visdrone_imgsz960_seed42
+source_data: configs/datasets/visdrone.yaml
+labeled_data: configs/datasets/visdrone_10pct.yaml
+dataset_root_override: /home/fj/datasets/visdrone
+prediction_cache: /home/fj/datasets/visdrone/pseudo/grounding_dino_quality/grounding_dino_base_thr005_text020_train_raw_predictions.csv
+output_root: /home/fj/datasets/visdrone/pseudo
+project: runs/yolo_arch
+report_dir: runs/yolo_arch/reports
+grounding_dino:
+  model_id: IDEA-Research/grounding-dino-base
+  box_threshold: 0.05
+  text_threshold: 0.20
+  max_det: 300
+  device: cuda
+training:
+  model: configs/models/yolo26n-p2.yaml
+  epochs: 120
+  batch: 16
+  image_size: 960
+  workers: 8
+  seed: 42
+  device: "0"
+variants:
+  area:
+    dataset_name: gdino_quality_mix10_area_seed42
+    run_name: yolo26n_p2_visdrone_gdino_quality_mix10_area_seed42
+    thresholds:
+      small: 0.25
+      medium: 0.30
+      large: 0.40

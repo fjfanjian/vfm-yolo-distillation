@@ -70,6 +70,84 @@ def test_load_experiment_config_when_stage_is_relation_distillation() -> None:
     assert config.training.image_size == 960
 
 
+def test_load_experiment_config_when_stage_is_objectness_auxiliary() -> None:
+    # Given
+    config_path = Path(
+        "configs/experiments/dinov3_objectness_aux_visdrone_10pct_imgsz960_lam005.yaml"
+    )
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "objectness_auxiliary"
+    assert config.dataset.label_budget == "10pct"
+
+
+def test_load_experiment_config_when_objectness_auxiliary_is_ignore_aware() -> None:
+    # Given
+    config_path = Path(
+        "configs/experiments/"
+        "dinov3_objectness_aux_ignore_aware_visdrone_10pct_imgsz960_seed42.yaml"
+    )
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "objectness_auxiliary"
+    assert config.training.seed == 42
+    assert config.outputs.name.endswith("ignore_seed42")
+
+
+def test_load_experiment_config_when_objectness_auxiliary_is_small_center() -> None:
+    # Given
+    config_path = Path(
+        "configs/experiments/"
+        "dinov3_objectness_aux_smallcenter_visdrone_10pct_imgsz960_lam001_seed42.yaml"
+    )
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "objectness_auxiliary"
+    assert config.training.seed == 42
+    assert config.outputs.name.endswith("smallcenter_lam001_seed42")
+
+
+def test_load_experiment_config_when_objectness_auxiliary_is_small_bg_contrast() -> None:
+    # Given
+    config_path = Path(
+        "configs/experiments/"
+        "dinov3_objectness_aux_small_bg_contrast_visdrone_10pct_imgsz960_lam001_seed42.yaml"
+    )
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "objectness_auxiliary"
+    assert config.training.seed == 42
+    assert config.outputs.name.endswith("small_bg_contrast_lam001_seed42")
+
+
+def test_load_experiment_config_when_dinov3_hybrid_small_subset() -> None:
+    # Given
+    config_path = Path(
+        "configs/experiments/"
+        "yolo_baseline_visdrone_10pct_imgsz960_dinov3_hybrid_small_seed42.yaml"
+    )
+
+    # When
+    config = load_experiment_config(config_path)
+
+    # Then
+    assert config.stage == "supervised_baseline"
+    assert config.training.seed == 42
+    assert config.outputs.name.endswith("dinov3_hybrid_small_seed42")
+
+
 def test_ultralytics_train_command_when_budget_is_partial() -> None:
     # Given
     config = load_experiment_config(Path("configs/experiments/yolo_baseline_visdrone_25pct.yaml"))

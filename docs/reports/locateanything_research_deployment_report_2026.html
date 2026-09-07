@@ -1,0 +1,1434 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NVIDIA LocateAnything Hugging Face Space 与 LocateAnything-3B 本地部署、伪标签集成调研报告">
+  <title>NVIDIA LocateAnything 调研与本地部署报告</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f6f3;
+      --paper: #ffffff;
+      --paper-2: #f9fbf8;
+      --ink: #17211d;
+      --muted: #62706a;
+      --line: #d7ded8;
+      --line-strong: #b7c4bc;
+      --accent: #0f766e;
+      --accent-dark: #0b4f49;
+      --accent-soft: #e4f4f1;
+      --nvidia: #76b900;
+      --warn: #8a5b0f;
+      --warn-bg: #fff6df;
+      --risk: #9f1239;
+      --risk-bg: #fff1f2;
+      --code-bg: #15211d;
+      --code-text: #e8f3ef;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      font-size: 16px;
+      line-height: 1.72;
+      letter-spacing: 0;
+    }
+
+    a {
+      color: var(--accent-dark);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    a:hover {
+      color: var(--accent);
+    }
+
+    .page {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+      gap: 28px;
+      align-items: end;
+      padding: 34px 0 24px;
+      border-bottom: 3px solid var(--accent);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      color: var(--accent-dark);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 10px;
+      height: 10px;
+      background: var(--nvidia);
+      border-radius: 2px;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.24;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(32px, 4.8vw, 54px);
+      max-width: 920px;
+    }
+
+    .subtitle {
+      margin: 0;
+      max-width: 780px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .meta-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+    }
+
+    .meta-card dl {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 92px 1fr;
+      gap: 8px 12px;
+      font-size: 14px;
+    }
+
+    .meta-card dt {
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .meta-card dd {
+      margin: 0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 28px;
+      margin-top: 28px;
+      align-items: start;
+    }
+
+    .toc {
+      position: sticky;
+      top: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 14px;
+    }
+
+    .toc h2 {
+      margin: 0 0 10px;
+      padding: 0;
+      border: 0;
+      font-size: 14px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+    }
+
+    .toc li {
+      margin: 6px 0;
+    }
+
+    main {
+      min-width: 0;
+    }
+
+    section {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      margin-bottom: 18px;
+      overflow: hidden;
+    }
+
+    .section-head {
+      padding: 18px 22px;
+      background: var(--paper-2);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .section-body {
+      padding: 20px 22px 24px;
+    }
+
+    h3 {
+      margin: 26px 0 10px;
+      font-size: 19px;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ul, ol {
+      margin: 8px 0 16px;
+      padding-left: 24px;
+    }
+
+    li {
+      margin: 5px 0;
+    }
+
+    .lead {
+      font-size: 17px;
+      color: var(--ink);
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin: 16px 0 18px;
+    }
+
+    .summary-item {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 14px 15px;
+      background: var(--paper-2);
+    }
+
+    .summary-item strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--accent-dark);
+      font-size: 14px;
+    }
+
+    .summary-item span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .callout, .warning, .risk {
+      border-radius: var(--radius);
+      padding: 15px 17px;
+      margin: 16px 0;
+      border: 1px solid;
+    }
+
+    .callout {
+      background: var(--accent-soft);
+      border-color: #bddbd5;
+    }
+
+    .warning {
+      background: var(--warn-bg);
+      border-color: #ebd19a;
+      color: #553907;
+    }
+
+    .risk {
+      background: var(--risk-bg);
+      border-color: #fecdd3;
+      color: #641324;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 10px 0 16px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border: 1px solid var(--line-strong);
+      border-radius: 999px;
+      padding: 2px 9px;
+      background: #fbfdfc;
+      color: #25433d;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      margin: 14px 0 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      font-size: 14px;
+    }
+
+    caption {
+      caption-side: top;
+      text-align: left;
+      padding: 10px 12px;
+      font-weight: 700;
+      color: var(--accent-dark);
+      background: var(--paper-2);
+      border-bottom: 1px solid var(--line);
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    th:last-child, td:last-child {
+      border-right: 0;
+    }
+
+    th {
+      background: #eef3ef;
+      color: #34443f;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    code {
+      color: #14322d;
+      background: #edf2ee;
+      border: 1px solid #d5ded7;
+      border-radius: 5px;
+      padding: 1px 5px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: .92em;
+    }
+
+    pre {
+      margin: 14px 0 18px;
+      padding: 15px 16px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: var(--radius);
+      overflow-x: auto;
+      line-height: 1.55;
+      font-size: 13px;
+    }
+
+    pre code {
+      background: transparent;
+      border: 0;
+      padding: 0;
+      color: inherit;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 14px 0 18px;
+    }
+
+    .mini-card {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 15px 16px;
+      background: var(--paper-2);
+    }
+
+    .mini-card h3 {
+      margin-top: 0;
+    }
+
+    .refs {
+      padding-left: 22px;
+    }
+
+    .refs li {
+      margin-bottom: 10px;
+    }
+
+    .footer {
+      margin-top: 26px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: center;
+    }
+
+    @media (max-width: 940px) {
+      .hero, .layout, .split {
+        grid-template-columns: 1fr;
+      }
+
+      .toc {
+        position: static;
+      }
+
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .page {
+        padding: 22px 14px 54px;
+      }
+
+      .hero {
+        padding-top: 18px;
+      }
+
+      .section-head, .section-body {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
+      h1 {
+        font-size: 31px;
+      }
+
+      .table-wrap {
+        border-radius: 0;
+        margin-left: -16px;
+        margin-right: -16px;
+        width: calc(100% + 32px);
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+      }
+
+      .page {
+        max-width: none;
+        padding: 0;
+      }
+
+      .layout, .hero {
+        display: block;
+      }
+
+      .toc {
+        position: static;
+        margin: 20px 0;
+      }
+
+      section, .summary-item, .mini-card, .callout, .warning, .risk, .table-wrap {
+        break-inside: avoid;
+      }
+
+      a {
+        color: #000;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <div>
+        <div class="eyebrow">Repository Research Report</div>
+        <h1>NVIDIA LocateAnything 调研与本地部署方案</h1>
+        <p class="subtitle">面向 VFM-assisted YOLO 蒸馏项目的技术评估：Space 仓库结构、LocateAnything-3B 模型能力、本地部署路径、伪标签流水线和风险控制。</p>
+      </div>
+      <aside class="meta-card" aria-label="报告元数据">
+        <dl>
+          <dt>对象</dt>
+          <dd><a href="https://huggingface.co/spaces/nvidia/LocateAnything">HF Space</a> / <a href="https://huggingface.co/nvidia/LocateAnything-3B">模型仓库</a></dd>
+          <dt>日期</dt>
+          <dd>2026-07-03</dd>
+          <dt>用途</dt>
+          <dd>训练期 teacher / pseudo-label source 评估</dd>
+          <dt>结论</dt>
+          <dd>可本地部署；推荐离线批量推理，不推荐部署期引入 teacher</dd>
+        </dl>
+      </aside>
+    </header>
+
+    <div class="layout">
+      <nav class="toc" aria-label="目录">
+        <h2>目录</h2>
+        <ol>
+          <li><a href="#summary">执行摘要</a></li>
+          <li><a href="#scope">调研对象</a></li>
+          <li><a href="#space">Space 仓库拆解</a></li>
+          <li><a href="#model">模型能力与机制</a></li>
+          <li><a href="#deploy">本地部署方案</a></li>
+          <li><a href="#batch">批量伪标签方案</a></li>
+          <li><a href="#project-fit">与当前项目集成</a></li>
+          <li><a href="#risk">风险与限制</a></li>
+          <li><a href="#checklist">验收清单</a></li>
+          <li><a href="#sources">参考来源</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <section id="summary">
+          <div class="section-head">
+            <h2>1. 执行摘要</h2>
+          </div>
+          <div class="section-body">
+            <p class="lead">NVIDIA LocateAnything 是一个面向自然语言视觉定位的 VLM 系统。Hugging Face Space 只是在线 demo；真正可复用的核心在 <code>nvidia/LocateAnything-3B</code> 模型仓库及其 <code>batch_infer.py</code>、<code>batch_utils</code>、<code>kernel_utils</code> 推理工具。</p>
+
+            <div class="summary-grid">
+              <div class="summary-item">
+                <strong>本地部署可行</strong>
+                <span>推荐 Linux/WSL2 + NVIDIA GPU + CUDA + PyTorch，使用 <code>uv</code> 管理 Python 环境。</span>
+              </div>
+              <div class="summary-item">
+                <strong>推荐用途</strong>
+                <span>作为训练期 VLM teacher 或伪标签源，为 YOLO 学生模型生成开放词表候选框。</span>
+              </div>
+              <div class="summary-item">
+                <strong>部署边界</strong>
+                <span>当前项目默认部署期保持 YOLO-only；LocateAnything 不应进入学生模型在线推理链路。</span>
+              </div>
+            </div>
+
+            <div class="callout">
+              <strong>首选路线：</strong>不要复刻 Space UI 作为生产工具。应直接使用模型仓库的批量推理入口，生成 JSONL 结果，再转换成 YOLO/COCO 伪标签，最后纳入配置驱动实验。
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <caption>决策摘要</caption>
+                <thead>
+                  <tr>
+                    <th>问题</th>
+                    <th>判断</th>
+                    <th>原因</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>能否本地部署</td>
+                    <td>可以</td>
+                    <td>模型仓库包含 Transformers remote code、模型配置、批量推理脚本和可选高吞吐推理工具。</td>
+                  </tr>
+                  <tr>
+                    <td>是否适合当前项目</td>
+                    <td>适合作为训练期 teacher 候选</td>
+                    <td>支持开放词表检测、短语 grounding、OCR、GUI grounding、pointing；对低标签数据扩展有价值。</td>
+                  </tr>
+                  <tr>
+                    <td>是否替代 Grounding DINO / YOLO-World</td>
+                    <td>不建议直接替代</td>
+                    <td>应先作为第三路伪标签源做质量评估，与现有 teacher 交叉过滤。</td>
+                  </tr>
+                  <tr>
+                    <td>是否直接信任输出框</td>
+                    <td>不建议</td>
+                    <td>输出主要是结构化文本坐标，没有传统 detector confidence；需要外部质量过滤。</td>
+                  </tr>
+                  <tr>
+                    <td>是否适合航拍小目标</td>
+                    <td>值得实验但需谨慎</td>
+                    <td>模型卡覆盖 aerial imagery 评估，但 Space 默认短边 cap 1024，可能损失 VisDrone 小目标。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="scope">
+          <div class="section-head">
+            <h2>2. 调研对象与信息源</h2>
+          </div>
+          <div class="section-body">
+            <p>本报告覆盖两个紧密相关的仓库：</p>
+            <ul>
+              <li><strong>在线 demo Space：</strong><a href="https://huggingface.co/spaces/nvidia/LocateAnything">nvidia/LocateAnything</a>。它提供 Gradio UI、上传文件处理、图片/视频结果可视化和 Space API。</li>
+              <li><strong>模型仓库：</strong><a href="https://huggingface.co/nvidia/LocateAnything-3B">nvidia/LocateAnything-3B</a>。它包含模型权重、Transformers remote code、批量推理 CLI、batch runtime 和稀疏 attention 工具。</li>
+            </ul>
+
+            <div class="badge-row">
+              <span class="badge">Gradio Space</span>
+              <span class="badge">Transformers remote code</span>
+              <span class="badge">Vision-language grounding</span>
+              <span class="badge">Open-set detection</span>
+              <span class="badge">Batch inference</span>
+              <span class="badge">Pseudo labels</span>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <caption>已确认的关键事实</caption>
+                <thead>
+                  <tr>
+                    <th>条目</th>
+                    <th>内容</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Space SDK</td>
+                    <td>Gradio，<code>sdk_version: 6.14.0</code>，<code>python_version: 3.10.13</code>，入口文件 <code>app.py</code>。</td>
+                  </tr>
+                  <tr>
+                    <td>默认模型</td>
+                    <td><code>MODEL_PATH</code> 默认是 <code>nvidia/LocateAnything-3B</code>。</td>
+                  </tr>
+                  <tr>
+                    <td>论文</td>
+                    <td><a href="https://arxiv.org/abs/2605.27365">arXiv:2605.27365</a>，题为 LocateAnything: Fast and High-Quality Vision-Language Grounding with Parallel Box Decoding。</td>
+                  </tr>
+                  <tr>
+                    <td>发布日期</td>
+                    <td>模型卡记录 GitHub、Hugging Face、Demo、Webpage 均在 2026-05-26 发布。</td>
+                  </tr>
+                  <tr>
+                    <td>许可证</td>
+                    <td>模型卡标注 <code>nvidia-license</code>，描述为学术/非营利研究使用，商用需要额外确认。</td>
+                  </tr>
+                  <tr>
+                    <td>在线可用性</td>
+                    <td>调研时 Space 主机 <code>https://nvidia-locateanything.hf.space/</code> 返回 <code>200 OK</code>。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="space">
+          <div class="section-head">
+            <h2>3. Space 仓库拆解</h2>
+          </div>
+          <div class="section-body">
+            <p>Space 仓库非常薄，主要是 demo 包装层，不是训练或评测工程。它适合学习 API 形状、prompt 模板、结果解析和可视化方式，但不适合作为当前项目的直接工程依赖。</p>
+
+            <div class="table-wrap">
+              <table>
+                <caption>Space 文件结构</caption>
+                <thead>
+                  <tr>
+                    <th>文件/目录</th>
+                    <th>作用</th>
+                    <th>复用价值</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>README.md</code></td>
+                    <td>Space metadata、标题、论文链接。</td>
+                    <td>低；信息很短。</td>
+                  </tr>
+                  <tr>
+                    <td><code>app.py</code></td>
+                    <td>模型加载、图片/视频推理、输出解析、绘制结果、Gradio API。</td>
+                    <td>中；可参考 prompt、坐标解析和 demo API。</td>
+                  </tr>
+                  <tr>
+                    <td><code>index.html</code></td>
+                    <td>自定义前端，调用 <code>/run_inference</code> API。</td>
+                    <td>低；当前项目不需要 UI。</td>
+                  </tr>
+                  <tr>
+                    <td><code>requirements.txt</code></td>
+                    <td>Space 运行依赖。</td>
+                    <td>中；可作为最小环境参考。</td>
+                  </tr>
+                  <tr>
+                    <td><code>assets/</code></td>
+                    <td>示例图片与字体。</td>
+                    <td>低；仅 demo 用。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>Space 中的核心类与函数</h3>
+            <ul>
+              <li><code>EagleWorker</code>：封装 <code>AutoTokenizer</code>、<code>AutoProcessor</code>、<code>AutoModel</code>，使用 <code>trust_remote_code=True</code> 加载模型。</li>
+              <li><code>generate_raw_prompt</code>：根据任务类型生成 prompt，支持 Detection、Grounding、OCR、GUI、Pointing。</li>
+              <li><code>parse_mixed_results</code>：解析模型输出中的 <code>&lt;ref&gt;</code> 与 <code>&lt;box&gt;</code> 标签。</li>
+              <li><code>draw_on_frame</code>：把归一化框或点画回原图/视频帧。</li>
+              <li><code>run_image_gpu_api</code> / <code>run_video_gpu_api</code>：ZeroGPU 包装的图片与视频推理入口。</li>
+              <li><code>run_inference_api</code>：Gradio 暴露的队列 API，前端调用这个接口。</li>
+            </ul>
+
+            <h3>Space UI 暴露的任务和参数</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>参数</th>
+                    <th>可选值/默认值</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>task_type</code></td>
+                    <td>Detection / Grounding / OCR / GUI / Pointing</td>
+                    <td>决定 prompt 模板。</td>
+                  </tr>
+                  <tr>
+                    <td><code>model_mode</code></td>
+                    <td>hybrid / fast / slow</td>
+                    <td>决定生成模式；OCR demo 默认切到 slow。</td>
+                  </tr>
+                  <tr>
+                    <td><code>short_size</code></td>
+                    <td>空值时自动 cap 到 1024</td>
+                    <td>输入短边缩放上限；航拍小目标应重点调参。</td>
+                  </tr>
+                  <tr>
+                    <td><code>temp</code> / <code>top_p</code> / <code>top_k</code></td>
+                    <td>0.7 / 0.9 / 20</td>
+                    <td>采样参数；伪标签生成建议先固定并降低随机性。</td>
+                  </tr>
+                  <tr>
+                    <td><code>max_video_frames</code></td>
+                    <td>默认 4，UI 最大 10</td>
+                    <td>视频 demo 是抽帧检测，不是时序跟踪。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="warning">
+              <strong>隐私注意：</strong>Space 源码包含可选日志逻辑，只有设置 <code>LOG_HF_TOKEN</code> 时才会通过 <code>CommitScheduler</code> 写入指定 dataset；但使用公共 Space 上传数据时，仍不应上传敏感图片、未授权数据集或内部业务素材。
+            </div>
+          </div>
+        </section>
+
+        <section id="model">
+          <div class="section-head">
+            <h2>4. 模型能力与推理机制</h2>
+          </div>
+          <div class="section-body">
+            <p>LocateAnything-3B 是一个通用视觉语言定位模型，目标是把自然语言描述转成结构化框或点。模型卡将其定位为研究开发用途，覆盖开放词表检测、dense detection、referring expression grounding、文档/OCR、GUI grounding、机器人/自动驾驶和遥感等场景。</p>
+
+            <div class="split">
+              <div class="mini-card">
+                <h3>架构组成</h3>
+                <ul>
+                  <li>语言模型：Qwen2.5-3B-Instruct。</li>
+                  <li>视觉编码器：MoonViT-SO-400M。</li>
+                  <li>多模态连接：MLP projector。</li>
+                  <li>模型仓库使用 Transformers <code>AutoModel</code> remote code。</li>
+                </ul>
+              </div>
+              <div class="mini-card">
+                <h3>核心机制</h3>
+                <ul>
+                  <li>Parallel Box Decoding，将 box/point 作为结构化块预测。</li>
+                  <li>支持 fast、slow、hybrid 三种模式。</li>
+                  <li>输出文本中嵌入 <code>&lt;box&gt;</code> 坐标 token。</li>
+                  <li>坐标归一化到 <code>[0,1000]</code>。</li>
+                </ul>
+              </div>
+            </div>
+
+            <h3>支持任务与 prompt 模板</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>任务</th>
+                    <th>输出</th>
+                    <th>推荐 prompt 模板</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Object Detection</td>
+                    <td>多框</td>
+                    <td><code>Locate all the instances that matches the following description: car&lt;/c&gt;person.</code></td>
+                  </tr>
+                  <tr>
+                    <td>Phrase Grounding</td>
+                    <td>单框或多框</td>
+                    <td><code>Locate all the instances that match the following description: people wearing red shirts.</code></td>
+                  </tr>
+                  <tr>
+                    <td>Scene Text Detection</td>
+                    <td>文本区域框</td>
+                    <td><code>Detect all the text in box format.</code></td>
+                  </tr>
+                  <tr>
+                    <td>GUI Grounding</td>
+                    <td>区域框或点</td>
+                    <td><code>Locate the region that matches the following description: search button.</code></td>
+                  </tr>
+                  <tr>
+                    <td>Pointing</td>
+                    <td>点</td>
+                    <td><code>Point to: traffic light.</code></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>输出格式</h3>
+            <p>模型输出是文本，不是 detector 常见的张量数组。典型输出如下：</p>
+            <pre><code>&lt;ref&gt;car&lt;/ref&gt;&lt;box&gt;&lt;128&gt;&lt;532&gt;&lt;214&gt;&lt;612&gt;&lt;/box&gt;
+&lt;ref&gt;person&lt;/ref&gt;&lt;box&gt;&lt;404&gt;&lt;461&gt;&lt;432&gt;&lt;548&gt;&lt;/box&gt;</code></pre>
+
+            <p>解析时需要将归一化坐标映射回像素坐标：</p>
+            <pre><code>x1_px = x1 / 1000 * image_width
+y1_px = y1 / 1000 * image_height
+x2_px = x2 / 1000 * image_width
+y2_px = y2 / 1000 * image_height</code></pre>
+
+            <div class="callout">
+              <strong>对 YOLO 伪标签的含义：</strong>转换到 YOLO label 时还要再变成 <code>class_id x_center_norm y_center_norm width_norm height_norm</code>。模型本身不会给出 YOLO 所需的类别 id，需要外部类别词表映射。
+            </div>
+
+            <h3>模型仓库中的批处理能力</h3>
+            <p>模型仓库包含 <code>batch_infer.py</code>，每条请求只需要图片路径与 query 字符串，输出 JSONL 包含原始响应和 stats。这比调用 Space API 更适合离线伪标签生产。</p>
+
+            <div class="table-wrap">
+              <table>
+                <caption>模型仓库关键文件</caption>
+                <thead>
+                  <tr>
+                    <th>文件/目录</th>
+                    <th>作用</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>batch_infer.py</code></td>
+                    <td>批量推理 CLI，支持 <code>--requests</code> JSONL、<code>--batch-size</code>、<code>--attn</code>、<code>--scheduler</code>、<code>--out</code>。</td>
+                  </tr>
+                  <tr>
+                    <td><code>batch_utils/</code></td>
+                    <td>批量 hybrid generation runtime，处理模型加载、tokenization、图像特征缓存、调度。</td>
+                  </tr>
+                  <tr>
+                    <td><code>kernel_utils/</code></td>
+                    <td>LA Flash sparse range attention 工具，用于高吞吐推理路径。</td>
+                  </tr>
+                  <tr>
+                    <td><code>processing_locateanything.py</code></td>
+                    <td>处理图片、视频、chat template 和视觉输入。</td>
+                  </tr>
+                  <tr>
+                    <td><code>modeling_locateanything.py</code></td>
+                    <td>Transformers 模型 remote code。</td>
+                  </tr>
+                  <tr>
+                    <td><code>generate_utils.py</code></td>
+                    <td>box/point 生成、合法性检查和解码逻辑。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="deploy">
+          <div class="section-head">
+            <h2>5. 本地部署方案</h2>
+          </div>
+          <div class="section-body">
+            <p>推荐把本地部署分成两个层级：先跑通批量推理，再根据需要复刻 Space UI。对于当前 YOLO 蒸馏项目，第一层级已经足够。</p>
+
+            <h3>5.1 环境建议</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>项目</th>
+                    <th>建议</th>
+                    <th>备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>操作系统</td>
+                    <td>Linux 或 WSL2 Ubuntu</td>
+                    <td>模型卡主要支持 Linux。Windows 原生 CUDA/PyTorch 可能能跑，但不作为首选。</td>
+                  </tr>
+                  <tr>
+                    <td>GPU</td>
+                    <td>NVIDIA GPU，建议 16GB 显存起步，24GB+ 更稳</td>
+                    <td>高分辨率图片、batch 推理、long prompt 都会抬高显存。</td>
+                  </tr>
+                  <tr>
+                    <td>Python</td>
+                    <td>3.10</td>
+                    <td>Space 使用 3.10.13。</td>
+                  </tr>
+                  <tr>
+                    <td>包管理</td>
+                    <td><code>uv</code></td>
+                    <td>符合当前仓库规则。</td>
+                  </tr>
+                  <tr>
+                    <td>PyTorch</td>
+                    <td>按 CUDA 版本安装 CUDA wheel</td>
+                    <td>不要盲装 CPU 版 torch。</td>
+                  </tr>
+                  <tr>
+                    <td>Hugging Face</td>
+                    <td>可选 <code>HF_TOKEN</code></td>
+                    <td>公开模型通常可直接下载；受限网络或许可门控时需要登录。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>5.2 推荐部署：模型仓库批量推理</h3>
+            <p>这是本项目最应该优先验证的路径。</p>
+            <pre><code>git clone https://huggingface.co/nvidia/LocateAnything-3B
+cd LocateAnything-3B
+
+uv venv --python 3.10
+source .venv/bin/activate
+
+# 根据本机 CUDA 版本调整 index-url。下面以 CUDA 12.8 wheel 为例。
+uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+
+uv pip install \
+  opencv-python-headless==4.11.0.86 \
+  transformers==4.57.1 \
+  numpy==1.25.0 \
+  Pillow==11.1.0 \
+  peft \
+  decord==0.6.0 \
+  lmdb==1.7.5 \
+  huggingface_hub</code></pre>
+
+            <p>准备请求文件：</p>
+            <pre><code># requests.jsonl
+{"image":"/data/visdrone/images/000001.jpg","query":"pedestrian&lt;/c&gt;people&lt;/c&gt;bicycle&lt;/c&gt;car&lt;/c&gt;van&lt;/c&gt;truck&lt;/c&gt;tricycle&lt;/c&gt;awning-tricycle&lt;/c&gt;bus&lt;/c&gt;motor"}</code></pre>
+
+            <p>先用保守配置做 smoke test：</p>
+            <pre><code>python batch_infer.py \
+  --model nvidia/LocateAnything-3B \
+  --requests requests.jsonl \
+  --batch-size 1 \
+  --attn sdpa \
+  --scheduler eager \
+  --max-new-tokens 2048 \
+  --temperature 0.1 \
+  --top-p 0.9 \
+  --out locateanything_outputs.jsonl</code></pre>
+
+            <p>确认输出正常后，再尝试提高 batch 或切换 attention 后端：</p>
+            <pre><code># 高吞吐尝试路径，需 flash-attn 等依赖可用
+python batch_infer.py \
+  --model nvidia/LocateAnything-3B \
+  --requests requests.jsonl \
+  --batch-size 4 \
+  --attn la_flash \
+  --scheduler pipeline \
+  --out locateanything_outputs.jsonl</code></pre>
+
+            <div class="warning">
+              <strong>注意：</strong><code>la_flash</code>、<code>magi</code> 属于性能路径，不是首个 smoke test 的必要条件。第一次部署应先用 <code>sdpa</code> 跑通功能，再优化吞吐和显存。
+            </div>
+
+            <h3>5.3 可选部署：复刻 Space UI</h3>
+            <p>如果需要给人工验收或可视化标注检查使用，可以复刻 Space demo。它不是伪标签生产的首选路径。</p>
+            <pre><code>git clone https://huggingface.co/spaces/nvidia/LocateAnything
+cd LocateAnything
+
+uv venv --python 3.10
+source .venv/bin/activate
+
+uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+uv pip install -r requirements.txt
+
+export MODEL_PATH=nvidia/LocateAnything-3B
+python app.py</code></pre>
+
+            <p>浏览器打开 Gradio 提示的本地地址即可。Space UI 适合小批量观察输出，但不适合跑完整 VisDrone 数据集。</p>
+
+            <h3>5.4 不优先推荐：直接走在线 Space API</h3>
+            <p>在线 Space API 可用于少量交互测试，但不推荐用于数据集级伪标签生成：</p>
+            <ul>
+              <li>ZeroGPU 队列和时长限制会影响吞吐。</li>
+              <li>公共服务上传数据存在隐私和许可风险。</li>
+              <li>API 的输出侧重 demo 可视化，不如本地 JSONL 批处理稳定。</li>
+              <li>无法严格固定依赖、模型版本和日志策略。</li>
+            </ul>
+
+            <h3>5.5 vLLM / SGLang 路径判断</h3>
+            <p>模型卡列出 vLLM 和 SGLang 的 OpenAI-compatible serve 示例，但当前项目不应把它作为第一部署方案。原因是：伪标签生产需要完整保留 LocateAnything 的 grounding prompt、box token 输出、hybrid/fast/slow 生成模式和解析流程；官方 <code>batch_infer.py</code> 更直接、更可审计。</p>
+
+            <div class="callout">
+              <strong>结论：</strong>先用 Transformers + <code>batch_infer.py</code>。只有当批量推理成为瓶颈，并且已完成输出一致性验证后，再考虑 vLLM/SGLang 或 LA Flash 优化。
+            </div>
+          </div>
+        </section>
+
+        <section id="batch">
+          <div class="section-head">
+            <h2>6. 批量伪标签生产方案</h2>
+          </div>
+          <div class="section-body">
+            <p>针对当前仓库的 VFM-assisted YOLO distillation 目标，LocateAnything 最合适的集成方式是离线伪标签源。整个流程应配置驱动，输出产物不提交 Git。</p>
+
+            <h3>6.1 推荐流水线</h3>
+            <ol>
+              <li>从数据集 YAML 或图片目录生成 image manifest。</li>
+              <li>把 VisDrone 类别词表拼成 LocateAnything query。</li>
+              <li>运行 <code>batch_infer.py</code> 输出 JSONL。</li>
+              <li>解析 <code>raw_response</code> 中的 <code>&lt;ref&gt;</code> 和 <code>&lt;box&gt;</code>。</li>
+              <li>映射类别名到 VisDrone class id，过滤非法框、过小框、异常长宽比框。</li>
+              <li>与 Grounding DINO / YOLO-World / 已有 YOLO baseline 交叉过滤。</li>
+              <li>导出 YOLO 标签目录或 COCO JSON，并写入新的 dataset config。</li>
+              <li>跑小样本 QA：可视化 50-200 张图，统计每类框数、面积分布和重复框。</li>
+            </ol>
+
+            <h3>6.2 Query 设计</h3>
+            <p>VisDrone 类别可直接使用英文类名，但需要对可能歧义的类别做 prompt 约束。</p>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>VisDrone 类别</th>
+                    <th>LocateAnything query 建议</th>
+                    <th>备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>pedestrian / people</td>
+                    <td><code>pedestrian&lt;/c&gt;people</code></td>
+                    <td>两者语义接近，需在后处理或人工 QA 中检查混淆。</td>
+                  </tr>
+                  <tr>
+                    <td>bicycle / motor</td>
+                    <td><code>bicycle&lt;/c&gt;motorcycle</code></td>
+                    <td>VisDrone 的 <code>motor</code> 建议转成更自然的 <code>motorcycle</code> 查询词。</td>
+                  </tr>
+                  <tr>
+                    <td>car / van / truck / bus</td>
+                    <td><code>car&lt;/c&gt;van&lt;/c&gt;truck&lt;/c&gt;bus</code></td>
+                    <td>适合作为第一批质量验证类别。</td>
+                  </tr>
+                  <tr>
+                    <td>tricycle / awning-tricycle</td>
+                    <td><code>tricycle&lt;/c&gt;awning tricycle</code></td>
+                    <td>长尾类别，预期混淆较高，需要单类评估。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <p>推荐第一轮用全类别 query 跑小样本，再比较单类 query 是否提高定位质量：</p>
+            <pre><code># 全类别 query
+pedestrian&lt;/c&gt;people&lt;/c&gt;bicycle&lt;/c&gt;car&lt;/c&gt;van&lt;/c&gt;truck&lt;/c&gt;tricycle&lt;/c&gt;awning tricycle&lt;/c&gt;bus&lt;/c&gt;motorcycle
+
+# 单类 query 示例
+car
+pedestrian
+small vehicles in aerial image</code></pre>
+
+            <h3>6.3 输出解析策略</h3>
+            <p>解析器需要兼容三种常见情况：</p>
+            <ul>
+              <li><code>&lt;ref&gt;label&lt;/ref&gt;&lt;box&gt;&lt;x1&gt;&lt;y1&gt;&lt;x2&gt;&lt;y2&gt;&lt;/box&gt;</code>：标准框。</li>
+              <li><code>&lt;box&gt;&lt;x&gt;&lt;y&gt;&lt;/box&gt;</code>：点输出，通常来自 pointing，不应直接转成检测框。</li>
+              <li>自然语言夹杂结构化标签：需要用正则抽取标签和坐标，不能依赖整段文本格式完全稳定。</li>
+            </ul>
+
+            <pre><code>def normalized_box_to_yolo(coords, image_w, image_h):
+    x1, y1, x2, y2 = coords
+    x1 = max(0.0, min(1.0, x1 / 1000.0))
+    y1 = max(0.0, min(1.0, y1 / 1000.0))
+    x2 = max(0.0, min(1.0, x2 / 1000.0))
+    y2 = max(0.0, min(1.0, y2 / 1000.0))
+    if x2 <= x1 or y2 <= y1:
+        return None
+    cx = (x1 + x2) / 2.0
+    cy = (y1 + y2) / 2.0
+    bw = x2 - x1
+    bh = y2 - y1
+    return cx, cy, bw, bh</code></pre>
+
+            <h3>6.4 过滤与融合建议</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>过滤层</th>
+                    <th>规则</th>
+                    <th>目的</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>格式过滤</td>
+                    <td>坐标数量必须为 4；<code>x2 &gt; x1</code>、<code>y2 &gt; y1</code>；归一化后必须在图像内。</td>
+                    <td>去除解析错误和退化框。</td>
+                  </tr>
+                  <tr>
+                    <td>尺寸过滤</td>
+                    <td>设置最小宽高、最小面积、最大面积占比。</td>
+                    <td>减少大范围 hallucination 框和极小噪声框。</td>
+                  </tr>
+                  <tr>
+                    <td>类别过滤</td>
+                    <td>只保留 VisDrone 类别词表可映射标签。</td>
+                    <td>避免自由文本 label 污染训练集。</td>
+                  </tr>
+                  <tr>
+                    <td>一致性过滤</td>
+                    <td>与 Grounding DINO、YOLO-World、YOLO baseline 的框做 IoU 或中心点一致性检查。</td>
+                    <td>弥补 LocateAnything 没有传统 confidence 的问题。</td>
+                  </tr>
+                  <tr>
+                    <td>重复框融合</td>
+                    <td>同类框 NMS / WBF，类别冲突时保留教师共识更高的类别。</td>
+                    <td>减少重复标签和冲突标签。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>6.5 建议的配置形状</h3>
+            <p>不建议把路径、类别和阈值写死在脚本里。可以新增类似下面的配置文件，例如 <code>configs/teachers/locateanything.yaml</code> 或实验配置中的 teacher 段：</p>
+            <pre><code>teacher:
+  name: locateanything
+  model: nvidia/LocateAnything-3B
+  mode: hybrid
+  attn: sdpa
+  scheduler: eager
+  max_new_tokens: 2048
+  temperature: 0.1
+  top_p: 0.9
+  query_separator: "&lt;/c&gt;"
+  image_short_size: null
+  classes:
+    pedestrian: ["pedestrian"]
+    people: ["people"]
+    bicycle: ["bicycle"]
+    car: ["car"]
+    van: ["van"]
+    truck: ["truck"]
+    tricycle: ["tricycle"]
+    awning-tricycle: ["awning tricycle"]
+    bus: ["bus"]
+    motor: ["motorcycle", "motor"]
+filters:
+  min_box_area_px: 4
+  max_box_area_ratio: 0.35
+  nms_iou: 0.6
+  require_teacher_agreement: false</code></pre>
+          </div>
+        </section>
+
+        <section id="project-fit">
+          <div class="section-head">
+            <h2>7. 与当前 VFM-YOLO 蒸馏项目的集成建议</h2>
+          </div>
+          <div class="section-body">
+            <p>当前仓库的规则是：DINOv3、Grounding DINO、YOLO-World 默认作为训练期 teacher 或伪标签源；部署期学生模型保持 YOLO-only，除非明确做 teacher-in-the-loop 推理实验。LocateAnything 应遵循同样边界。</p>
+
+            <h3>推荐落点</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>模块</th>
+                    <th>建议</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>configs/teachers/</code></td>
+                    <td>新增 LocateAnything teacher 配置</td>
+                    <td>记录模型 id、推理模式、类别映射、过滤阈值。</td>
+                  </tr>
+                  <tr>
+                    <td><code>scripts/</code></td>
+                    <td>新增小型可复现脚本</td>
+                    <td>只做 manifest 生成、批量调用、格式转换；复杂逻辑下沉到 <code>src/</code>。</td>
+                  </tr>
+                  <tr>
+                    <td><code>src/vfm_yolo_distillation/</code></td>
+                    <td>新增可复用解析和伪标签转换逻辑</td>
+                    <td>如 <code>locateanything_parser.py</code>、<code>pseudo_label_fusion.py</code>。</td>
+                  </tr>
+                  <tr>
+                    <td><code>configs/experiments/</code></td>
+                    <td>新增对照实验配置</td>
+                    <td>例如 quality mix、teacher agreement、single-teacher ablation。</td>
+                  </tr>
+                  <tr>
+                    <td><code>runs/</code> 或外部目录</td>
+                    <td>存放生成伪标签和中间 JSONL</td>
+                    <td>不要提交数据集、权重、推理产物。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>第一阶段实验设计</h3>
+            <ol>
+              <li><strong>小样本可行性：</strong>随机抽取 100-300 张 VisDrone train 图片，运行全类别 query。</li>
+              <li><strong>视觉 QA：</strong>生成带框可视化，按类别检查漏检、错检、框偏移、重复框。</li>
+              <li><strong>统计 QA：</strong>比较每类框数、面积分布、宽高比分布与 GT / Grounding DINO / YOLO-World。</li>
+              <li><strong>一致性实验：</strong>分别测试 LocateAnything 单源、LocateAnything + Grounding DINO 共识、LocateAnything + YOLO-World 共识。</li>
+              <li><strong>短训验证：</strong>只在 10% 标签设定跑短程 pseudo-label training，先看是否出现明显负迁移。</li>
+            </ol>
+
+            <h3>与已有 teacher 的角色划分</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Teacher</th>
+                    <th>优势</th>
+                    <th>限制</th>
+                    <th>建议角色</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>DINOv3</td>
+                    <td>强通用视觉表征，可做 objectness / feature distillation。</td>
+                    <td>不直接输出类别框；全图 patch 对小目标容易稀释。</td>
+                    <td>特征蒸馏、objectness 辅助、候选区域信号。</td>
+                  </tr>
+                  <tr>
+                    <td>Grounding DINO</td>
+                    <td>开放词表检测成熟，输出框和 score。</td>
+                    <td>类别 prompt 与阈值敏感；小目标质量需校准。</td>
+                    <td>主力伪标签 teacher 之一。</td>
+                  </tr>
+                  <tr>
+                    <td>YOLO-World</td>
+                    <td>YOLO 风格检测速度快，输出更接近学生训练格式。</td>
+                    <td>开放词表质量受类别词和分布影响。</td>
+                    <td>伪标签候选与 detector agreement。</td>
+                  </tr>
+                  <tr>
+                    <td>LocateAnything</td>
+                    <td>VLM grounding 能力强，覆盖 dense detection、OCR、短语 grounding、遥感评估。</td>
+                    <td>输出是文本坐标，没有标准 confidence；本地显存需求高。</td>
+                    <td>第三路开放词表 teacher，用于补充和交叉验证。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="callout">
+              <strong>建议优先级：</strong>先做 LocateAnything 小样本伪标签质量审计，再决定是否写完整训练脚本。不要一开始就跑全量数据集，避免生成大量难以审计的噪声标签。
+            </div>
+          </div>
+        </section>
+
+        <section id="risk">
+          <div class="section-head">
+            <h2>8. 风险、限制与规避策略</h2>
+          </div>
+          <div class="section-body">
+            <div class="risk">
+              <strong>许可风险：</strong>模型卡标注 NVIDIA License，并描述为非商业研究使用。当前项目如果用于论文/研究通常可继续评估；若涉及商业部署、公开服务或再分发权重，必须重新核查许可证文本。
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>风险</th>
+                    <th>表现</th>
+                    <th>规避策略</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>显存不足</td>
+                    <td>加载失败、OOM、batch 推理不稳定。</td>
+                    <td>先用 <code>batch-size=1</code>、<code>sdpa</code>、较低分辨率 smoke test；再逐步扩大。</td>
+                  </tr>
+                  <tr>
+                    <td>小目标缩放损失</td>
+                    <td>Space 默认短边 cap 1024，航拍小目标可能被压得过小。</td>
+                    <td>本地批量推理评估不同输入尺寸或切图策略；不要直接沿用 Space 默认。</td>
+                  </tr>
+                  <tr>
+                    <td>无 detector confidence</td>
+                    <td>难以按置信度过滤伪标签。</td>
+                    <td>使用 teacher agreement、NMS/WBF、面积分布、类别白名单和人工抽检替代。</td>
+                  </tr>
+                  <tr>
+                    <td>文本输出不稳定</td>
+                    <td>自然语言夹杂框标签，解析失败或 label 不规范。</td>
+                    <td>写健壮 parser，保留 raw response，失败样本进入 QA 日志。</td>
+                  </tr>
+                  <tr>
+                    <td>类别混淆</td>
+                    <td><code>people</code>/<code>pedestrian</code>、<code>motor</code>/<code>bicycle</code>、三轮车类别混淆。</td>
+                    <td>做类别映射表，必要时拆成单类 query，按类统计伪标签质量。</td>
+                  </tr>
+                  <tr>
+                    <td><code>trust_remote_code</code></td>
+                    <td>执行模型仓库 Python 代码。</td>
+                    <td>固定 commit/hash，审计 remote code，在隔离环境运行。</td>
+                  </tr>
+                  <tr>
+                    <td>公共 Space 隐私</td>
+                    <td>上传数据受服务端环境和日志策略影响。</td>
+                    <td>敏感或内部数据只在本地运行，不走公共 Space。</td>
+                  </tr>
+                  <tr>
+                    <td>训练负迁移</td>
+                    <td>噪声伪标签拉低 YOLO 学生性能。</td>
+                    <td>先跑短程 ablation；保持干净 baseline；不要用伪标签覆盖真标签。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <h3>部署期边界</h3>
+            <p>LocateAnything 不应进入默认部署期推理链路。当前项目规则要求 deployment-time student models YOLO-only，除非实验明确研究 teacher-in-the-loop inference。LocateAnything 的合理位置是训练前/训练中生成伪标签或辅助分析，而不是线上检测器。</p>
+          </div>
+        </section>
+
+        <section id="checklist">
+          <div class="section-head">
+            <h2>9. 本地部署验收清单</h2>
+          </div>
+          <div class="section-body">
+            <h3>环境验收</h3>
+            <ul>
+              <li><code>nvidia-smi</code> 可见目标 GPU，驱动与 CUDA 版本匹配。</li>
+              <li><code>python -c "import torch; print(torch.cuda.is_available())"</code> 返回 <code>True</code>。</li>
+              <li><code>transformers==4.57.1</code>、<code>torch</code>、<code>torchvision</code>、<code>Pillow</code>、<code>opencv-python-headless</code> 可正常导入。</li>
+              <li>首次运行能完整下载模型文件，HF cache 不写入项目仓库。</li>
+            </ul>
+
+            <h3>功能验收</h3>
+            <ul>
+              <li>单张图片推理输出 JSONL，并包含 <code>raw_response</code>。</li>
+              <li><code>raw_response</code> 中能解析出至少一个合法 <code>&lt;box&gt;</code>。</li>
+              <li>坐标映射回像素后没有负宽高、越界严重或整图框泛滥。</li>
+              <li>同一张图片用固定参数重复运行，输出波动在可接受范围内。</li>
+              <li>可视化结果和原图对齐，没有宽高交换、坐标顺序错误。</li>
+            </ul>
+
+            <h3>伪标签验收</h3>
+            <ul>
+              <li>每类伪标签数量与 GT 分布或已有 teacher 分布没有数量级异常。</li>
+              <li>小目标框面积分布合理，不被大量 1-2 像素框污染。</li>
+              <li>抽检图像覆盖白天/夜晚、密集道路、稀疏场景、不同高度视角。</li>
+              <li>伪标签输出目录、可视化目录和模型下载缓存均未被 Git 跟踪。</li>
+              <li>短训实验必须保留 baseline、single-teacher、teacher-agreement 对照。</li>
+            </ul>
+
+            <h3>建议的最小实验矩阵</h3>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>实验</th>
+                    <th>样本</th>
+                    <th>目的</th>
+                    <th>通过条件</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Smoke 10</td>
+                    <td>10 张图片</td>
+                    <td>确认环境、下载、推理、解析。</td>
+                    <td>无崩溃，能解析合法框。</td>
+                  </tr>
+                  <tr>
+                    <td>QA 100</td>
+                    <td>100 张图片</td>
+                    <td>人工看框质量和类别混淆。</td>
+                    <td>主要类别框可用，没有系统性坐标错误。</td>
+                  </tr>
+                  <tr>
+                    <td>Stats 300</td>
+                    <td>300 张图片</td>
+                    <td>统计分布、与 GT/其他 teacher 比较。</td>
+                    <td>框数、面积、类别分布无明显异常。</td>
+                  </tr>
+                  <tr>
+                    <td>Short train</td>
+                    <td>10% 标签 + 伪标签</td>
+                    <td>评估是否负迁移。</td>
+                    <td>短程验证不明显低于 baseline。</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="sources">
+          <div class="section-head">
+            <h2>10. 参考来源</h2>
+          </div>
+          <div class="section-body">
+            <ol class="refs">
+              <li><a href="https://huggingface.co/spaces/nvidia/LocateAnything">NVIDIA LocateAnything Hugging Face Space</a>：Space 页面、文件列表、README metadata、Gradio app 入口。</li>
+              <li><a href="https://huggingface.co/spaces/nvidia/LocateAnything/blob/main/app.py">Space app.py</a>：模型加载、prompt 生成、结果解析、图片/视频推理 API、可选日志逻辑。</li>
+              <li><a href="https://huggingface.co/spaces/nvidia/LocateAnything/blob/main/requirements.txt">Space requirements.txt</a>：demo 依赖版本。</li>
+              <li><a href="https://huggingface.co/nvidia/LocateAnything-3B">nvidia/LocateAnything-3B 模型卡</a>：模型能力、架构、许可证、推理说明、批处理工具、硬件与软件支持。</li>
+              <li><a href="https://huggingface.co/nvidia/LocateAnything-3B/blob/main/batch_infer.py">模型仓库 batch_infer.py</a>：JSONL 批量推理 CLI 参数与输出格式。</li>
+              <li><a href="https://huggingface.co/nvidia/LocateAnything-3B/blob/main/batch_utils/README.md">batch_utils README</a>：<code>sdpa</code>、<code>eager</code>、<code>magi</code>、<code>la_flash</code> runtime 模式和环境变量。</li>
+              <li><a href="https://arxiv.org/abs/2605.27365">arXiv:2605.27365</a>：LocateAnything 论文摘要与 Parallel Box Decoding 方法描述。</li>
+              <li><a href="https://github.com/NVlabs/Eagle/tree/main/Embodied">NVlabs/Eagle Embodied</a>：模型卡列出的 GitHub code quick link。</li>
+            </ol>
+
+            <div class="warning">
+              <strong>报告边界：</strong>本报告基于公开 Space、模型卡、模型仓库文件和论文摘要调研；未在本机执行真实 GPU 推理，也未下载完整权重进行速度/显存实测。硬件容量建议属于部署规划建议，最终应以本机 smoke test 为准。
+            </div>
+          </div>
+        </section>
+
+        <p class="footer">本报告为静态 HTML 文档，可直接在浏览器打开；其中命令示例优先使用 <code>uv</code>，并遵守当前仓库不提交数据集、权重、实验运行和伪标签产物的规则。</p>
+      </main>
+    </div>
+  </div>
+</body>
+</html>

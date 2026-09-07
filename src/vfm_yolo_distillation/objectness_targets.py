@@ -58,6 +58,17 @@ class PeakIgnoreSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class SmallCenterTargetSettings:
+    """Settings for center-focused small-object auxiliary targets."""
+
+    small_area_px: float
+    radius_cells: float
+    sigma_cells: float
+    max_centers_per_image: int
+    weight: float
+
+
+@dataclass(frozen=True, slots=True)
 class GtAreaMasks:
     """Boolean masks for small, medium, large, and any GT areas."""
 
@@ -179,6 +190,67 @@ def build_peak_ignore_targets(
     labels = positives.to(dtype=targets.dtype)
     weights = (positives | negatives).to(dtype=targets.dtype)
     return labels, weights
+
+
+def build_small_center_targets(
+    batch_idx: torch.Tensor,
+    bboxes_xywhn: torch.Tensor,
+    image_size_hw: tuple[int, int],
+    target_hw: tuple[int, int],
+    batch_size: int,
+    settings: SmallCenterTargetSettings,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Build small-object Gaussian center targets and sparse loss weights."""
+    device = bboxes_xywhn.device if bboxes_xywhn.numel() else batch_idx.device
+    target_h, target_w = target_hw
+    shape = (batch_size, 1, target_h, target_w)
+    targets = torch.zeros(shape, dtype=bboxes_xywhn.dtype, device=device)
+    weights = torch.zeros_like(targets)
+    if bboxes_xywhn.numel() == 0:
+        return targets, weights
+
+    image_h, image_w = image_size_hw
+    radius = max(float(settings.radius_cells), 0.5)
+    sigma = max(float(settings.sigma_cells), 1e-6)
+    centers_per_image = [0 for _ in range(batch_size)]
+    for index in range(bboxes_xywhn.shape[0]):
+        image_index = int(batch_idx[index].item())
+        if image_index < 0 or image_index >= batch_size:
+            continue
+        if centers_per_image[image_index] >= settings.max_centers_per_image:
+            continue
+
+        x_center, y_center, box_w, box_h = bboxes_xywhn[index]
+        area_px = float((box_w * image_w * box_h * image_h).item())
+        if area_px > settings.small_area_px:
+            continue
+
+        center_x = float((x_center * target_w).item())
+        center_y = float((y_center * target_h).item())
+        left = max(0, int(torch.floor(targets.new_tensor(center_x - radius)).item()))
+        right = min(target_w, int(torch.ceil(targets.new_tensor(center_x + radius)).item()))
+        top = max(0, int(torch.floor(targets.new_tensor(center_y - radius)).item()))
+        bottom = min(target_h, int(torch.ceil(targets.new_tensor(center_y + radius)).item()))
+        if right <= left or bottom <= top:
+            continue
+
+        grid_x = torch.arange(left, right, device=device, dtype=targets.dtype) + 0.5
+        grid_y = torch.arange(top, bottom, device=device, dtype=targets.dtype) + 0.5
+        distance_sq = (grid_y[:, None] - center_y).square() + (grid_x[None, :] - center_x).square()
+        gaussian = torch.exp(-distance_sq / (2.0 * sigma * sigma))
+
+        target_region = targets[image_index, 0, top:bottom, left:right]
+        targets[image_index, 0, top:bottom, left:right] = torch.maximum(
+            target_region, gaussian
+        )
+        weight_region = weights[image_index, 0, top:bottom, left:right]
+        weights[image_index, 0, top:bottom, left:right] = torch.maximum(
+            weight_region,
+            weight_region.new_tensor(settings.weight),
+        )
+        centers_per_image[image_index] += 1
+
+    return targets, weights
 
 
 def weighted_soft_objectness_loss(

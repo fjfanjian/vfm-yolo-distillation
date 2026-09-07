@@ -191,7 +191,7 @@ def decide_gate(small_ap50_95: float, overall_map50_95: float) -> GateDecision:
         )
     return GateDecision(
         outcome=GateOutcome.RUN_LAYER_ABLATION,
-        message="small AP missed the gate; stop small-tile multi-seed and run layer ablation.",
+        message="small AP missed the gate; stop this target branch multi-seed and run layer ablation.",
         extra_seeds=(),
     )
 

@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>伪标签师生检测与 DINO 系列在目标检测中的应用综述</title>
+  <style>
+    :root {
+      --bg: #f7f8f5;
+      --paper: #ffffff;
+      --ink: #1c2321;
+      --muted: #64706a;
+      --line: #d9ded6;
+      --accent: #0f766e;
+      --accent-2: #8a5a00;
+      --soft: #edf6f3;
+      --warn: #fff4da;
+      --code: #24312d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      line-height: 1.72;
+      letter-spacing: 0;
+    }
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 72px;
+    }
+    header {
+      border-bottom: 3px solid var(--accent);
+      padding: 28px 0 22px;
+      margin-bottom: 28px;
+    }
+    h1 {
+      margin: 0 0 14px;
+      font-size: clamp(30px, 4vw, 48px);
+      line-height: 1.16;
+      letter-spacing: 0;
+    }
+    h2 {
+      margin: 44px 0 14px;
+      padding-top: 10px;
+      border-top: 1px solid var(--line);
+      font-size: 28px;
+      line-height: 1.25;
+    }
+    h3 {
+      margin: 30px 0 10px;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+    p { margin: 0 0 14px; }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+    .meta {
+      color: var(--muted);
+      font-size: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+    }
+    .summary {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-left: 5px solid var(--accent);
+      padding: 18px 20px;
+      margin: 24px 0;
+    }
+    .summary strong { color: var(--accent); }
+    .toc {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 18px 22px;
+      margin: 22px 0 30px;
+    }
+    .toc ol {
+      columns: 2;
+      padding-left: 22px;
+      margin: 0;
+    }
+    .toc li { break-inside: avoid; margin: 3px 0; }
+    .note {
+      background: var(--warn);
+      border: 1px solid #ead6a8;
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+    .callout {
+      background: var(--soft);
+      border: 1px solid #cfe3dc;
+      padding: 16px 18px;
+      margin: 18px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+    .panel {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      padding: 16px 18px;
+    }
+    .panel h3 { margin-top: 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--paper);
+      margin: 18px 0 28px;
+      font-size: 14px;
+    }
+    caption {
+      text-align: left;
+      font-weight: 700;
+      color: var(--code);
+      margin-bottom: 8px;
+    }
+    th, td {
+      border: 1px solid var(--line);
+      padding: 10px 11px;
+      vertical-align: top;
+    }
+    th {
+      background: #eef2ef;
+      text-align: left;
+      font-weight: 700;
+    }
+    td ul, td ol { margin: 0; padding-left: 18px; }
+    .tag {
+      display: inline-block;
+      border: 1px solid #b8c7c2;
+      background: #f5faf8;
+      color: #24564f;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 12px;
+      margin: 0 4px 4px 0;
+      white-space: nowrap;
+    }
+    code {
+      color: var(--code);
+      background: #eef2ef;
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 0.93em;
+    }
+    ol.refs {
+      padding-left: 24px;
+    }
+    ol.refs li {
+      margin-bottom: 10px;
+    }
+    .small { font-size: 13px; color: var(--muted); }
+    .print-hint { color: var(--muted); font-size: 13px; margin-top: 18px; }
+    @media (max-width: 820px) {
+      main { padding: 20px 14px 48px; }
+      .toc ol { columns: 1; }
+      .grid { grid-template-columns: 1fr; }
+      table { font-size: 13px; display: block; overflow-x: auto; }
+      h1 { font-size: 30px; }
+      h2 { font-size: 24px; }
+    }
+    @media print {
+      body { background: #fff; }
+      main { max-width: none; padding: 0; }
+      a { color: #000; }
+      .toc, .summary, .panel, .callout, .note, table { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>伪标签师生检测与 DINO 系列在目标检测中的应用综述</h1>
+    <div class="meta">
+      <span>调研日期：2026-07-03</span>
+      <span>工具：ai4scholar MCP（Semantic Scholar 检索、snippet、全文读取）</span>
+      <span>场景：VFM-assisted YOLO distillation for low-label aerial small-object detection</span>
+    </div>
+  </header>
+
+  <section class="summary">
+    <p><strong>结论概览。</strong>伪标签师生目标检测在少标注、小样本和零样本场景中的有效性，主要来自六类策略：更强或更稳定的教师、更可靠的伪标签筛选、弱强增强一致性、软标签/低置信标签利用、类别与尺度不均衡校正，以及用 VFM/开放词汇模型补充语义先验。对航拍小目标而言，最值得优先采用的是“训练期多教师伪标注 + 切片保持分辨率 + 类别自适应阈值 + 定位一致性/密度/objectness 复筛 + YOLO-only 学生部署”的组合。</p>
+    <p>DINOv1/v2/v3 在目标检测中的角色要和 DINO 检测器区分开：DINOv1/v2/v3 是自监督视觉表征模型，通常用作前景发现、冻结特征、伪标签评估、特征蒸馏或检测骨干；Grounding DINO 中的 DINO 则是 DETR 系列的检测器改进。DINOv3 相比 DINOv2 的关键进展是更稳定的高分辨率 dense features，原文报告冻结 7B/16 backbone 的 COCO 检测 mAP 可达 66.1，这说明它很适合作为训练期教师或 objectness/feature teacher，但对部署期 YOLO 学生仍应保持离线蒸馏而非教师在线推理。</p>
+  </section>
+
+  <nav class="toc" aria-label="目录">
+    <strong>目录</strong>
+    <ol>
+      <li><a href="#method">检索方法与证据范围</a></li>
+      <li><a href="#taxonomy">伪标签师生检测的策略谱系</a></li>
+      <li><a href="#fewzero">小样本/零样本检测中的伪标签机制</a></li>
+      <li><a href="#remote">遥感与航拍小目标场景</a></li>
+      <li><a href="#dino-family">DINOv1/v2/v3 的检测应用</a></li>
+      <li><a href="#grounding-yolo">Grounding DINO 与 YOLO-World</a></li>
+      <li><a href="#effect">效果对照与适用边界</a></li>
+      <li><a href="#recommendations">对本项目的实验建议</a></li>
+      <li><a href="#refs">参考文献</a></li>
+    </ol>
+  </nav>
+
+  <section id="method">
+    <h2>1. 检索方法与证据范围</h2>
+    <p>本报告使用 ai4scholar MCP 的 Semantic Scholar 检索与全文读取能力完成。检索覆盖四条主线：第一，经典半监督目标检测中的 teacher-student pseudo labeling，包括 Unbiased Teacher、Soft Teacher、LabelMatch、Dense Teacher、OneTeacher 等；第二，小样本和极少标注检测中的 adaptive pseudo labeling、prototype soft labels、confidence-tiered pseudo labels；第三，开放词汇和零样本检测中由 CLIP、Grounding DINO、YOLO-World、RemoteCLIP 等模型生成伪标签或语义候选的做法；第四，DINOv1、DINOv2、DINOv3 这类自监督视觉基础模型在目标发现、检测骨干、特征增强、伪标签评估和蒸馏中的使用方式。</p>
+    <p>检索关键词包括但不限于：<code>teacher student pseudo label few-shot object detection</code>、<code>Unbiased Teacher semi-supervised object detection</code>、<code>Soft Teacher object detection</code>、<code>open vocabulary object detection pseudo label</code>、<code>DINO self-supervised vision transformer object detection</code>、<code>DINOv2 object detection dense prediction</code>、<code>DINOv3 Gram anchoring dense features detection</code>、<code>remote sensing semi-supervised object detection pseudo label</code>、<code>Grounding DINO YOLO teacher student</code>、<code>YOLO-World real-time open vocabulary object detection</code>。其中 DINOv2 和 DINOv3 原文通过 ai4scholar 的全文读取工具复核了训练机制和检测指标；DINOv3 的 COCO mAP 66.1 来自其原文检测附录。</p>
+    <div class="note">
+      <p><strong>术语边界。</strong>文献中至少有两个“DINO”。其一是 Caron/Oquab/Siméoni 系列的自监督视觉表征模型 DINO、DINOv2、DINOv3；其二是 Zhang 等提出的 DETR with Improved DeNoising Anchor Boxes，即 DINO 检测器。Grounding DINO 是把 DINO 检测器与 grounded pre-training 结合，不等同于 DINOv1/v2/v3 自监督表征模型。</p>
+    </div>
+  </section>
+
+  <section id="taxonomy">
+    <h2>2. 伪标签师生检测的策略谱系</h2>
+    <p>目标检测中的伪标签比分类更难，因为每个伪标签同时包含类别、框位置、尺度、重复框抑制和背景判定。少标注时，教师检测器往往对少数类和大目标过度自信，对小目标、遮挡目标、长尾类和领域迁移目标低置信或漏检；学生再用这些标签训练会放大 confirmation bias。因此有效方法几乎都在回答同一组问题：哪些教师预测可用，哪些低置信预测应该保留，类别分布是否被扭曲，框定位是否可信，学生是否在强增强视图上保持一致，以及教师更新是否过快导致伪标签分布漂移。</p>
+    <p>经典 SSOD 的主干范式是 mean teacher 或 teacher-student self-training：教师在弱增强图像上产生伪框，学生在强增强图像上学习，教师由学生 EMA 更新。Unbiased Teacher 发现 SSOD 中有明显 pseudo-labeling bias，并用 class-balance loss 减轻过度自信伪标签导致的类别偏置；Soft Teacher 则把教师分类分数作为未标注框分类损失权重，并用 box jittering 判断框回归可靠性；LabelMatch 从 distribution-level 和 instance-level 同时修正 label mismatch；Dense Teacher 进一步把 sparse pseudo boxes 替换为 dense pseudo-label，减少 NMS/阈值等后处理超参损失的信息。</p>
+    <table>
+      <caption>表 1：伪标签师生检测中提升效果的主要策略</caption>
+      <thead>
+        <tr>
+          <th>策略类别</th>
+          <th>解决的问题</th>
+          <th>代表做法</th>
+          <th>对航拍小目标的启示</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>教师稳定化</td>
+          <td>教师随学生一起漂移，伪标签分布频繁变化，训练早期错误被放大。</td>
+          <td>EMA teacher、周期性更新教师、离线强教师、DINO Teacher 的冻结 VFM labeller。</td>
+          <td>Grounding DINO / YOLO-World / DINOv3 更适合先做训练期离线教师或慢更新教师，不建议部署期绑定重教师。</td>
+        </tr>
+        <tr>
+          <td>伪标签筛选</td>
+          <td>固定置信阈值会漏掉小目标和困难类，保留过多低质框又会引入噪声。</td>
+          <td>class-adaptive threshold、quantile threshold、confidence-tiered pseudo labels、score + localization quality 双准则。</td>
+          <td>小目标可用较低分类阈值，但必须叠加定位稳定性、DINOv3 objectness 或多视图一致性。</td>
+        </tr>
+        <tr>
+          <td>软监督与低置信利用</td>
+          <td>少样本教师弱，只有高置信框时覆盖不足，尤其召回不足。</td>
+          <td>Soft Teacher 加权分类损失、prototype soft labels、low-confidence pseudo label distillation。</td>
+          <td>对车辆、行人等密集小目标，低置信候选可以作为 objectness/foreground 蒸馏，而不是直接当硬类别标签。</td>
+        </tr>
+        <tr>
+          <td>一致性学习</td>
+          <td>检测器对尺度、裁剪、颜色、几何变换不稳定，伪标签坐标变换后难以匹配。</td>
+          <td>弱强增强一致性、多尺度一致性、feature consistency、temporal/video consistency。</td>
+          <td>航拍图像应优先使用 tile-level multi-scale consistency，避免小目标在缩放后消失。</td>
+        </tr>
+        <tr>
+          <td>类别/尺度不均衡校正</td>
+          <td>伪标签偏向常见类、大目标和背景简单区域，长尾类/新类被压制。</td>
+          <td>class-balance loss、label distribution-aware threshold、dynamic label queue、frequency-based class weighting。</td>
+          <td>VisDrone/DIOR/DOTA 类数据应按类别、面积段和场景密度分别记录伪标签覆盖率，不能只看全局 mAP。</td>
+        </tr>
+        <tr>
+          <td>多教师与后处理融合</td>
+          <td>单教师在开放词汇、小目标或定位上有结构性短板。</td>
+          <td>Grounding DINO 负责文本语义，YOLO-World 负责快速候选，DINOv3 负责 dense objectness，WBF/NMS/box jitter 修框。</td>
+          <td>本项目可把多个教师输出转成统一 COCO/YOLO 格式，再由配置控制融合策略和阈值。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>2.1 置信阈值从全局固定转向自适应</h3>
+    <p>早期伪标签检测常采用一个全局 confidence threshold，但这在少标注检测里很脆弱。类间样本量、目标尺度、目标纹理和场景背景差异很大时，同样的 0.7 分数不代表同样的伪标签质量。Adaptive Pseudo Labeling for FSOD 用每个 novel class 的置信分布分位数决定 class-adaptive threshold，并融合预训练 few-shot detector 与 teacher model 两路 CATF 结果。LabelMatch 进一步把未标注数据的类别分布近似约束引入阈值，使用 label-distribution-aware confidence thresholds。遥感 CTPL 的结果也说明，在极少标注情况下只保留高置信伪标签会覆盖不足；中等置信标签在质量可控时反而能明显改善学生性能。</p>
+    <p>对小目标检测而言，自适应阈值不只是按类别分组，还应按面积段和成像条件分组。例如航拍中同一类别车辆在不同高度、光照和拥堵场景下分数分布差异很大，若统一阈值，密集场景中的小车和遮挡行人会被系统性丢掉。更稳妥的方案是将筛选拆成两阶段：第一阶段用较宽松分数阈值保证召回，第二阶段用定位稳定性、多尺度一致性、DINOv3 patch foreground/objectness、教师间一致性来筛掉噪声。这样可以避免把分类置信度当作伪标签质量的唯一代理。</p>
+
+    <h3>2.2 定位质量比分类分数更关键</h3>
+    <p>目标检测伪标签的主要噪声不只是错类，还包括框偏移、漏掉目标边界、重复框和只覆盖物体局部。Soft Teacher 的 box jittering 是一个重要信号：如果对伪框做扰动后预测仍稳定，框回归标签更可信。遥感 oriented object detection 文献进一步引入 localization quality metric、aspect ratio-aware localization loss reweighting 和旋转信息增强，因为航拍目标常有任意方向、极端长宽比和密集邻接。Dense Teacher、CDPL、RemoteDPL 则强调 dense pseudo-label 或 dense target producer，理由是 sparse boxes 加 NMS 可能损失场景中的细粒度对象信息。</p>
+    <p>本项目若使用 Grounding DINO/YOLO-World 产伪标签，不宜只用文本匹配分数筛框。对 VisDrone 这类小目标数据，框的几何可信度可以来自四个信号：同一图像不同尺度切片的框是否重合；不同教师是否在相近区域给出 objectness；DINOv3 patch 相似图是否在框内外形成清晰前景差；训练中 YOLO 学生对该框的回归残差是否持续下降。报告建议把这些信号写成配置驱动的 pseudo label scoring，而不是固化在脚本中。</p>
+
+    <h3>2.3 低置信伪标签的正确用法</h3>
+    <p>低置信预测不能简单等同于噪声。LPLD、PS-TTL、confidence-tiered pseudo labeling 等工作说明，低置信候选往往包含 foreground recall 信息，尤其在 domain shift、few-shot novel classes、小目标或弱教师场景中，高置信阈值会产生严重 false negative。更合理的做法是降低它们在类别损失中的硬监督权重，转而把它们用于 objectness、proposal recall、prototype similarity、soft label 或 feature distillation。也就是说，低置信标签可以告诉学生“这里可能有物体”，但不一定强迫学生相信“这是某个具体类别”。</p>
+    <p>这种策略特别适合航拍小目标。小目标在开放词汇教师中常表现为文本类别分数低、框边界粗糙，但前景性仍然明显。DINOv3 或 DINOv2 的 dense feature 可以作为与类别无关的前景/相似性证据；Grounding DINO 和 YOLO-World 则提供类别语义。组合后可以将候选划分为三层：高置信硬标签用于正常检测损失；中置信软标签用于带权类别损失和框回归；低置信 foreground-only 标签用于 objectness 或 feature consistency。这样比简单删除低分框更能提升召回。</p>
+  </section>
+
+  <section id="fewzero">
+    <h2>3. 小样本/零样本检测中的伪标签机制</h2>
+    <p>few-shot object detection 的常规问题是 base/novel 偏置：模型在 base classes 上有较充分训练，但 novel classes 的 few-shot support 不足以覆盖外观变化。Semi-Supervised FSOD via Adaptive Pseudo Labeling 指出，base dataset 中实际上可能包含大量未标注 novel instances，若能通过 teacher 和预训练 FSOD detector 发现这些实例，就能缓解 novel 类数据稀缺。其 CATF 根据每个 novel class 的分数分布分位数设阈值，并融合两路伪标签，核心是让阈值跟随类别难度而变化。</p>
+    <p>LEDetection/SoftER Teacher 把问题进一步设为 base 和 novel 标注都稀缺的 semi-supervised FSOD。其发现是：未标注数据可通过 region proposals 显著增强 few-shot detector，且强 SSOD detector 往往带来更强 FSOD detector。PS-TTL 则在测试时使用 mean-teacher 自训练发现 novel instances，并用 prototype-based soft labels 处理低置信伪标签的分类混淆。这些工作共同说明，few-shot 检测不应只依赖 support set 微调，而应把 unlabeled target images 当作潜在 novel 类分布补充。</p>
+    <p>零样本和开放词汇检测的伪标签来源更偏语义模型。PB-OVD 使用预训练视觉语言模型从大规模 image-caption pairs 自动生成 pseudo bounding-box labels，以扩大训练类别集合；CORA 用 CLIP region prompting 和 anchor pre-matching 改善 region-level 识别与 unseen localization；DST-Det 用 CLIP 对背景 proposals 做 zero-shot 分类，把一部分原本会被当作背景的候选转为 novel class 训练样本；SAS-Det 针对开放词汇自训练中的 noisy PL 和 PL distribution changes，设计 split-and-fusion head 与周期性教师更新来稳定训练。</p>
+    <p>这类方法给本项目的启示是：零样本检测不是直接把开放词汇教师部署上线，而是把它变成一个训练期的候选生成器和语义校验器。Grounding DINO 可以利用类别名、短语和属性 prompt 给出高召回候选；YOLO-World 可以用更高速度生成开放词汇候选；DINOv3 可以从 dense feature 侧检查候选是否像“稳定物体”。最后仍应把这些信号蒸馏进 YOLO 学生，使部署期保持 YOLO-only。</p>
+  </section>
+
+  <section id="remote">
+    <h2>4. 遥感与航拍小目标场景</h2>
+    <p>遥感/航拍目标检测有几个与自然图像不同的约束：目标小且密集，任意方向和长宽比常见，背景纹理复杂，类别长尾明显，标注成本高，且同一类别在不同传感器、高度、城市形态下分布漂移。RS-PCL 用 teacher-student 伪标签和 consistency learning 处理 remote sensing images，并提出 Noisy Pseudo box Assignment 与 Scale-Invariant Learning；RemoteDPL 用 dense pseudo-labeling、多尺度融合、实例密度分支和两阶段筛选处理密集场景；Dual-Criterion Pseudo Label Selection 用分类置信和定位质量双准则，并在 DOTA-v1.5 的 10%、20%、30% 标注比例下报告 49.23、55.71、59.10 mAP。</p>
+    <p>开放词汇航拍检测也开始直接使用 VLM/VFM 教师。CastDet 使用 RemoteCLIP 作为额外全知教师，在学生-教师框架中提升 novel proposals 和分类，并在 VisDroneZSD novel categories 上达到 46.5% mAP，较当时 SOTA 高 21.0 mAP。OS-W2S 构建语言引导开放集航拍标注引擎，将词、短语、句子级语言指导引入航拍检测，训练后 Grounding DINO 在 sentence-level zero-shot transfer 上提升 31.1 AP50 和 34.7 Recall@10。RT-OVAD 则强调实时开放词汇航拍检测，在 DIOR、DOTA-v2.0、LAE-80C 上报告 87.7 AP50、53.8 mAP、23.7 mAP，并达到 34 FPS。</p>
+    <p>对当前仓库而言，遥感文献支持三项工程判断。第一，伪标签生成前应先做 tile/patch 切片，避免缩放到教师输入尺寸后小目标消失；第二，筛选指标应按小目标面积段单独监控，不能只看总体 precision；第三，DINOv3 或 RemoteCLIP 这类 VFM 更适合训练期补先验，而不是替代 YOLO 学生部署。仓库已有 Grounding DINO、YOLO-World、DINOv3 相关配置和评估脚本，这与文献方向一致。</p>
+  </section>
+
+  <section id="dino-family">
+    <h2>5. DINOv1/v2/v3 在目标检测中的应用</h2>
+    <h3>5.1 DINOv1：从自监督注意力到无监督目标发现</h3>
+    <p>DINOv1 即 Caron 等的 <em>Emerging Properties in Self-Supervised Vision Transformers</em>。它不是检测器，而是一种无标签自蒸馏 ViT 表征学习方法。原文指出，自监督 ViT 特征包含清晰的语义分割信息，这种性质在监督 ViT 和 CNN 中并不同样明显；小 ViT 的 k-NN ImageNet top-1 可达 78.3%，ViT-Base linear eval 达 80.1%。这说明 DINOv1 的价值在于 patch token 和 attention map 中自然出现 foreground/objectness，而不是直接输出类别框。</p>
+    <p>随后 TokenCut 等工作利用 DINO 自监督 ViT 特征构建 token graph，用 normalized cut 发现前景目标。TokenCut 在 VOC07、VOC12、COCO20K 无监督目标发现上分别较 LOST 提升 6.9%、8.1%、8.1%，并可扩展到 saliency detection 和 weakly supervised object detection。这条线对检测的贡献是“找到候选前景区域”，尤其适合无标注或极少标注时作为伪框/伪 mask 生成的前处理。局限是 DINOv1 的类别语义弱，patch 分辨率和目标边界也不足以直接替代检测器。</p>
+
+    <h3>5.2 DINOv2：通用 frozen features、feature enhancer 与 pseudo labeller</h3>
+    <p>DINOv2 把 DINO+iBOT 风格的自监督训练扩大到 142M curated images，并训练 ViT-g/14 等大模型，再蒸馏到 S/B/L 等可用尺寸。原文强调其特征在 image-level 和 pixel-level benchmarks 上都很强，且可不微调使用。对检测来说，DINOv2 的直接用法通常有三类：作为 frozen backbone 或辅助 backbone；作为 DETR/Mask R-CNN/ViTDet 的 feature enhancer；作为离线 labeller 或 feature alignment teacher。</p>
+    <p>Frozen-DETR 是一个代表：它不把 foundation model 直接替换为检测骨干，而是把冻结 CLIP/DINOv2 的 class tokens 和 patch tokens 作为 feature enhancer 注入 DETR。ai4scholar snippet 显示，该方法在多个 DETR 系基线上带来 2.7 到 4.0 AP 的提升，并指出收益更多来自高层语义理解而非纹理细节，能降低 false negative、classification error 和 background error。DINO Teacher 则在 domain adaptive object detection 中用冻结 DINOv2 ViT-G 训练 Faster R-CNN labeller，仅用源域数据生成目标域伪标签，并用 DINO feature alignment 推动学生学习更泛化的表示。</p>
+    <p>DINOv2 的限制也很清楚。它不是语言模型，不能独立解决开放词汇类别映射；它的 patch size 和冻结特征对极小目标可能不够细；如果直接作为部署 backbone，计算成本高于 YOLO 系列。因而在本项目中，DINOv2/DINOv3 更适合提供训练期 dense feature/objectness、对伪标签排序、做特征蒸馏或做对照实验，而不是替代 YOLO 学生。</p>
+
+    <h3>5.3 DINOv3：面向 dense prediction 的高分辨率基础表征</h3>
+    <p>DINOv3 的核心动机是：DINOv2 继续放大模型和训练周期时，dense feature maps 会退化；DINOv3 用 Gram anchoring 约束 patch feature 的关系结构，解决长程训练下 dense features 变差的问题。原文还引入 7B 参数 ViT 模型、constant schedules、high-resolution post-training、多学生蒸馏以及对 resolution/model size/text alignment 的 post-hoc 策略。ai4scholar 全文读取显示，DINOv3 在冻结视觉 backbone 的情况下报告 COCO detection mAP 66.1、ADE20k mIoU 63.0，并明确将目标检测列为 dense downstream task。</p>
+    <p>DINOv3 在检测中的用法可分成强、中、轻三档。强用法是像 DINOv3 原文那样冻结 7B/16 backbone，接 Plain-DETR 风格编码器/解码器，在 Objects365 和 COCO 上训练高性能 detector；这能验证上限，但计算成本高，不适合本项目默认部署。中等用法是 DINO-YOLO、DisDop 等思路，把 DINOv3 特征或蒸馏先验注入 YOLO/轻量检测器：DINO-YOLO 在土木工程小数据场景报告裂缝、PPE、KITTI 等任务分别提升 12.4%、13.7%、88.6%，但有 2-4 倍推理开销。轻量用法是仅在训练期读取 DINOv3 patch/dense features，作为 objectness teacher、coverage subset selector、feature distillation target 或 pseudo label rescoring signal，最终学生仍为 YOLO。</p>
+    <p>对航拍小目标，DINOv3 最有价值的不是直接给类别，而是提供“高分辨率 dense semantic consistency”。航拍图像中的小车、行人、摩托车常在开放词汇教师中低分，但 DINOv3 patch 相似图可能仍能显示局部前景结构。将 Grounding DINO/YOLO-World 的类别候选与 DINOv3 的 dense foreground/objectness 结合，比单独依赖任一教师更稳。报告建议优先探索 DINOv3 作为离线 teacher signal：对候选框内部/边界/邻域 patch 做相似性统计，形成 pseudo-label quality score。</p>
+
+    <table>
+      <caption>表 2：DINOv1/v2/v3 与 DINO 检测器的区别</caption>
+      <thead>
+        <tr>
+          <th>名称</th>
+          <th>本质</th>
+          <th>检测中的典型使用</th>
+          <th>已报告效果或关键证据</th>
+          <th>本项目建议</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>DINOv1</td>
+          <td>无标签自蒸馏 ViT 表征学习。</td>
+          <td>attention/patch feature 前景发现、无监督目标发现、弱监督定位。</td>
+          <td>ImageNet linear eval 80.1%；TokenCut 在 VOC/COCO 无监督目标发现较 LOST 提升约 6.9-8.1 个百分点。</td>
+          <td>可作为历史基线，不建议作为当前主教师。</td>
+        </tr>
+        <tr>
+          <td>DINOv2</td>
+          <td>大规模 curated images 上的自监督通用视觉特征。</td>
+          <td>冻结 backbone、feature enhancer、domain adaptation labeller、feature alignment teacher。</td>
+          <td>DINO Teacher 用冻结 DINOv2 labeller 替代普通 mean teacher；Frozen-DETR 使用 DINOv2/CLIP tokens 提升 DETR 2.7-4.0 AP。</td>
+          <td>适合做训练期特征蒸馏和伪标签复筛；若已有 DINOv3，优先比较 DINOv2 vs DINOv3。</td>
+        </tr>
+        <tr>
+          <td>DINOv3</td>
+          <td>更大规模 SSL VFM，重点改善 high-resolution dense features。</td>
+          <td>冻结强检测 backbone、dense objectness teacher、YOLO feature distillation、遥感/高分辨率特征提取。</td>
+          <td>原文报告冻结 backbone 的 COCO detection mAP 66.1；Gram anchoring 改善长程训练下 dense feature 退化。</td>
+          <td>优先作为训练期 teacher signal，不作为默认部署模型。</td>
+        </tr>
+        <tr>
+          <td>DINO detector</td>
+          <td>DETR with Improved DeNoising Anchor Boxes。</td>
+          <td>端到端检测器，也是 Grounding DINO 的检测器基础之一。</td>
+          <td>COCO R50 12/24 epochs 为 49.4/51.3 AP；Objects365 + Swin-L 后 COCO val/test-dev 约 63.2/63.3 AP。</td>
+          <td>用于理解 Grounding DINO，不要和 DINOv3 teacher 混为一谈。</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="grounding-yolo">
+    <h2>6. Grounding DINO 与 YOLO-World 作为训练期教师</h2>
+    <p>Grounding DINO 将 DETR-style DINO 检测器与 grounded pre-training 结合，通过 feature enhancer、language-guided query selection 和 cross-modality decoder 融合视觉与语言。原文报告 COCO zero-shot transfer AP 52.5、ODinW zero-shot mean AP 26.1。它适合作为高召回、强语义的离线自动标注器，尤其当目标类别可以用类别名、同义词、短语或属性描述时。缺点是推理慢、prompt 敏感、框对小目标可能偏粗，且直接部署成本高。</p>
+    <p>YOLO-World 则把 YOLO 的实时性与开放词汇语义结合，提出 RepVL-PAN 和 region-text contrastive loss，在 LVIS 上 zero-shot AP 35.4，并报告 V100 上 52.0 FPS。它比 Grounding DINO 更接近部署速度，但作为开放词汇检测器仍可能受域差异和文本 prompt 影响。对本项目而言，YOLO-World 是很好的训练期候选教师和部署可行性对照，但默认学生仍可选择普通 YOLO-only，以避免开放词汇文本分支增加部署复杂度。</p>
+    <p>多传感器和航拍文献中，Grounding DINO 自动标注 + YOLO 学生训练已经被直接验证。Son 与 Jung 使用 Grounding DINO 自动标注多设备图像，再训练 YOLOv8 学生，报告自动生成标签不会造成性能退化，自动标注加手工标注能进一步提升。零标签航拍海事监控工作也强调重型 VLM 作为 autonomous annotator，训练轻量学生用于边缘 UAV；其中 tiling 被用来保持高空小目标分辨率。这些做法与本项目规则一致：DINOv3、Grounding DINO、YOLO-World 默认保留为训练期教师或伪标签源，部署期学生保持 YOLO-only。</p>
+  </section>
+
+  <section id="effect">
+    <h2>7. 效果对照与适用边界</h2>
+    <table>
+      <caption>表 3：代表方法的效果证据</caption>
+      <thead>
+        <tr>
+          <th>方法</th>
+          <th>任务设定</th>
+          <th>关键机制</th>
+          <th>报告效果</th>
+          <th>边界</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Unbiased Teacher</td>
+          <td>SSOD，COCO/VOC 少标注。</td>
+          <td>EMA teacher + class-balance loss。</td>
+          <td>COCO 1% 标注较 SOTA +6.8 mAP；0.5/1/2% 标注较监督 baseline 约 +10 mAP。</td>
+          <td>仍依赖分类置信筛选，开放词汇能力有限。</td>
+        </tr>
+        <tr>
+          <td>Soft Teacher</td>
+          <td>端到端 SSOD。</td>
+          <td>教师分数加权分类损失 + box jittering 选可靠框。</td>
+          <td>全 COCO baseline 40.9 mAP 经未标注 COCO 提升到 44.5；Swin detector 58.9 到 60.4。</td>
+          <td>定位过滤有效，但对小目标低召回仍需额外机制。</td>
+        </tr>
+        <tr>
+          <td>Dense Teacher</td>
+          <td>SSOD。</td>
+          <td>dense pseudo-label 替代 sparse boxes，减少后处理信息损失。</td>
+          <td>摘要报告在 COCO/VOC 多种设置优于 pseudo-box 方法。</td>
+          <td>实现与检测头强相关，迁移到 YOLO 需设计 dense target 对齐。</td>
+        </tr>
+        <tr>
+          <td>OneTeacher / SSOD-YOLO</td>
+          <td>一阶段/YOLO 半监督检测。</td>
+          <td>multi-view pseudo-label refinement、decoupled semi-supervised optimization、augmentation-guided pseudo-label optimization。</td>
+          <td>OneTeacher 报告较 Unbiased Teacher 有 15.0% 相对 AP gain；SSOD-YOLO 报告较 OneTeacher/Unbiased Teacher +1.7/+3.9 mAP50-95。</td>
+          <td>YOLO 训练技巧会稀释 SSOD 收益，需控制 mosaic、强增强和多任务损失冲突。</td>
+        </tr>
+        <tr>
+          <td>Adaptive Pseudo Labeling FSOD</td>
+          <td>半监督 few-shot detection。</td>
+          <td>class-adaptive threshold filtering + 两路伪标签融合。</td>
+          <td>PASCAL VOC / MS COCO 验证有效，目标是缓解 novel class 数据稀缺和 base bias。</td>
+          <td>依赖初始 few-shot detector 质量；类别分位数在样本极少时可能不稳。</td>
+        </tr>
+        <tr>
+          <td>CTPL for RS FSOD</td>
+          <td>DIOR 5-shot/class 遥感检测。</td>
+          <td>confidence-tiered pseudo labels，中置信标签补覆盖。</td>
+          <td>42.3% mAP@50，较 GT-only 32.3% 有 +31.0% 相对提升；高置信-only 几乎不提升。</td>
+          <td>教师弱时 curriculum progressive training 可能累积错误。</td>
+        </tr>
+        <tr>
+          <td>CastDet</td>
+          <td>开放词汇航拍检测。</td>
+          <td>RemoteCLIP 额外教师 + dynamic label queue。</td>
+          <td>VisDroneZSD novel categories 46.5% mAP，较 SOTA +21.0 mAP。</td>
+          <td>依赖 RemoteCLIP 和开放词汇训练设计，需处理 base/novel 平衡。</td>
+        </tr>
+        <tr>
+          <td>Grounding DINO</td>
+          <td>开放集/指代表达检测。</td>
+          <td>语言引导 query selection + cross-modality decoder。</td>
+          <td>COCO zero-shot AP 52.5，ODinW zero-shot mean AP 26.1。</td>
+          <td>慢、prompt 敏感；小目标需 tiling 与后处理。</td>
+        </tr>
+        <tr>
+          <td>YOLO-World</td>
+          <td>实时开放词汇检测。</td>
+          <td>RepVL-PAN + region-text contrastive loss。</td>
+          <td>LVIS 35.4 AP，V100 52.0 FPS。</td>
+          <td>域外航拍仍需 fine-tune 或蒸馏；文本分支增加部署复杂度。</td>
+        </tr>
+        <tr>
+          <td>DINOv3</td>
+          <td>自监督 VFM 用于 dense prediction/detection。</td>
+          <td>Gram anchoring + high-resolution dense features + frozen backbone detector。</td>
+          <td>原文报告 COCO detection mAP 66.1、ADE20k mIoU 63.0。</td>
+          <td>强模型计算成本高，默认更适合训练期 teacher/distillation。</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>从效果证据看，收益最大的一类方法往往不是单独“换一个更强教师”，而是同时提升伪标签质量和伪标签覆盖率。Unbiased Teacher 解决类别偏置，Soft Teacher 解决定位可靠性，LabelMatch 解决分布/实例匹配，Dense Teacher 保留 dense information，开放词汇方法扩大类别空间，DINOv3 提供 dense feature prior。对少标注航拍小目标而言，这些策略必须组合使用，因为单一置信阈值策略很容易在小目标召回和噪声之间失衡。</p>
+    <p>也要注意负面边界。第一，开放词汇教师的“能检测任意词”不等于“能在航拍小目标上给高质量框”；prompt、切片尺度和 NMS 都会显著影响伪标签。第二，DINOv3 的高分辨率 dense feature 很强，但它没有天然类别文本接口，不应替代 Grounding DINO 或 YOLO-World 的语义角色。第三，SSOD 的 mAP 提升常来自 COCO/VOC，自然图像结论迁移到 VisDrone/DOTA/DIOR 时必须重新验证 AP_small、crowded scenes、per-class recall 和 pseudo label precision。</p>
+  </section>
+
+  <section id="recommendations">
+    <h2>8. 对本项目的实验建议</h2>
+    <div class="grid">
+      <div class="panel">
+        <h3>推荐主线 A：多教师离线伪标签</h3>
+        <p>使用 Grounding DINO 生成高召回文本语义候选，YOLO-World 生成快速开放词汇候选，DINOv3 生成 dense objectness/coverage score。三者通过统一 schema 融合：类别来自文本教师，框质量来自多尺度一致性和 jitter，前景性来自 DINOv3 patch features。输出只作为训练数据，不参与部署。</p>
+      </div>
+      <div class="panel">
+        <h3>推荐主线 B：小目标分层阈值</h3>
+        <p>按类别、面积段和 tile 尺度维护阈值。高置信框进入硬标签训练；中置信框进入 soft-label/weighted loss；低置信但 DINOv3 foreground 强的框进入 objectness 或 feature distillation。每组阈值写入 <code>configs/</code>，避免脚本硬编码。</p>
+      </div>
+      <div class="panel">
+        <h3>推荐主线 C：YOLO 学生蒸馏</h3>
+        <p>保持 deployment-time student YOLO-only。训练时可添加 DINOv3 feature/objectness auxiliary loss、teacher box consistency loss、relation distillation 或 pseudo-label replay；推理导出时移除教师与辅助头。</p>
+      </div>
+      <div class="panel">
+        <h3>推荐主线 D：面向 AP_small 的评估</h3>
+        <p>除了 mAP，还应报告 AP_small、per-class pseudo label precision/recall、每张图伪标签密度、低/中/高置信标签占比、teacher disagreement、NMS 前后候选损失率。小目标伪标签策略如果只提升总体 AP 但降低 AP_small，不应作为主线。</p>
+      </div>
+    </div>
+
+    <h3>8.1 建议的配置化实验矩阵</h3>
+    <table>
+      <caption>表 4：建议落到 configs/ 的实验矩阵</caption>
+      <thead>
+        <tr>
+          <th>实验组</th>
+          <th>教师源</th>
+          <th>伪标签筛选</th>
+          <th>学生训练</th>
+          <th>主要指标</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Baseline PL</td>
+          <td>Grounding DINO 或 YOLO-World 单教师。</td>
+          <td>固定 confidence threshold + NMS。</td>
+          <td>YOLO 常规训练。</td>
+          <td>mAP、AP_small、伪标签数量。</td>
+        </tr>
+        <tr>
+          <td>Class-Adaptive PL</td>
+          <td>同 Baseline。</td>
+          <td>按类别分位数阈值；长尾类设最小保留数。</td>
+          <td>YOLO 常规训练。</td>
+          <td>per-class AP、per-class recall。</td>
+        </tr>
+        <tr>
+          <td>DINOv3-Rescored PL</td>
+          <td>Grounding DINO + DINOv3。</td>
+          <td>confidence + DINOv3 objectness + multi-scale consistency。</td>
+          <td>YOLO + 伪标签加权损失。</td>
+          <td>AP_small、pseudo precision、teacher disagreement。</td>
+        </tr>
+        <tr>
+          <td>Soft/LowConf PL</td>
+          <td>Grounding DINO + YOLO-World + DINOv3。</td>
+          <td>高/中/低三层；中低置信不直接硬分类。</td>
+          <td>YOLO + soft label/objectness distillation。</td>
+          <td>召回率、误检率、AP_small。</td>
+        </tr>
+        <tr>
+          <td>Teacher Ablation</td>
+          <td>分别移除 Grounding DINO、YOLO-World、DINOv3。</td>
+          <td>固定最优筛选策略。</td>
+          <td>同一 YOLO 学生。</td>
+          <td>各教师对类别、定位、小目标召回的贡献。</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3>8.2 伪标签质量评分建议</h3>
+    <p>建议为每个候选框计算一个结构化质量向量，而不是一个单分数：<code>class_score</code> 来自 Grounding DINO/YOLO-World；<code>box_stability</code> 来自多尺度、flip、jitter 后 IoU；<code>objectness_score</code> 来自 DINOv3 patch foreground；<code>teacher_agreement</code> 来自多教师框匹配；<code>area_bucket</code> 标记 small/medium/large；<code>class_bucket_threshold</code> 来自类别分位数。训练时再由配置决定如何把质量向量映射为硬标签、软标签或 objectness-only 标签。</p>
+    <p>这种设计能把文献策略统一起来：Unbiased Teacher 的类别平衡对应 <code>class_bucket_threshold</code>；Soft Teacher 的加权损失对应 <code>class_score</code> 权重；box jittering 对应 <code>box_stability</code>；DINOv3/DINO Teacher 对应 <code>objectness_score</code> 和 feature alignment；开放词汇教师对应 <code>class_score</code> 与 prompt ensemble。工程上也便于做消融，不会让每个实验都变成独立脚本。</p>
+
+    <h3>8.3 风险与检查项</h3>
+    <p>第一，伪标签文件、数据集和 checkpoint 不应提交；只提交配置、脚本和报告。第二，Grounding DINO/YOLO-World 的 prompt 需要版本化，类别同义词和负 prompt 都会影响标签分布。第三，tile-based 伪标注要记录原图坐标映射，避免小目标框在 tile 合并时出现重复或偏移。第四，DINOv3 特征若用于离线缓存，应明确缓存目录在 runs/data 外且被 gitignore 覆盖。第五，所有实验都要保留 student-only inference 的导出检查，避免教师依赖意外进入部署路径。</p>
+  </section>
+
+  <section id="refs">
+    <h2>9. 参考文献</h2>
+    <ol class="refs">
+      <li>Yen-Cheng Liu et al. <a href="https://arxiv.org/pdf/2102.09480">Unbiased Teacher for Semi-Supervised Object Detection</a>. ICLR, 2021.</li>
+      <li>Mengde Xu et al. <a href="https://arxiv.org/pdf/2106.09018">End-to-End Semi-Supervised Object Detection with Soft Teacher</a>. ICCV, 2021.</li>
+      <li>Binbin Chen et al. <a href="https://arxiv.org/pdf/2206.06608">Label Matching Semi-Supervised Object Detection</a>. CVPR, 2022.</li>
+      <li>Hongyu Zhou et al. <a href="http://arxiv.org/pdf/2207.02541">Dense Teacher: Dense Pseudo-Labels for Semi-supervised Object Detection</a>. arXiv, 2022.</li>
+      <li>Gen Luo et al. <a href="http://arxiv.org/pdf/2302.11299">Towards End-to-end Semi-supervised Learning for One-stage Object Detection</a>. arXiv, 2023.</li>
+      <li>Ying-Jhe Tang et al. <a href="https://doi.org/10.1109/TCSVT.2023.3301854">Semi-Supervised Few-Shot Object Detection via Adaptive Pseudo Labeling</a>. TCSVT, 2024.</li>
+      <li>Phi Vu Tran. <a href="https://arxiv.org/pdf/2303.05739">LEDetection: A Simple Framework for Semi-Supervised Few-Shot Object Detection</a>. arXiv, 2023.</li>
+      <li>Shiyu Zhao et al. <a href="https://arxiv.org/pdf/2308.06412">Taming Self-Training for Open-Vocabulary Object Detection</a>. CVPR, 2024.</li>
+      <li>Yan Li et al. <a href="https://arxiv.org/pdf/2311.11646">CastDet: Toward Open Vocabulary Aerial Object Detection with CLIP-Activated Student-Teacher Learning</a>. arXiv, 2023.</li>
+      <li>Shilong Liu et al. <a href="http://arxiv.org/pdf/2303.05499">Grounding DINO: Marrying DINO with Grounded Pre-Training for Open-Set Object Detection</a>. arXiv, 2023.</li>
+      <li>Tianheng Cheng et al. <a href="https://arxiv.org/pdf/2401.17270">YOLO-World: Real-Time Open-Vocabulary Object Detection</a>. CVPR, 2024.</li>
+      <li>Mathilde Caron et al. <a href="http://arxiv.org/pdf/2104.14294">Emerging Properties in Self-Supervised Vision Transformers</a>. ICCV, 2021.</li>
+      <li>Yangtao Wang et al. <a href="https://arxiv.org/pdf/2202.11539">Self-Supervised Transformers for Unsupervised Object Discovery using Normalized Cut</a>. CVPR, 2022.</li>
+      <li>Maxime Oquab et al. <a href="http://arxiv.org/pdf/2304.07193">DINOv2: Learning Robust Visual Features without Supervision</a>. TMLR, 2024.</li>
+      <li>Oriane Siméoni et al. <a href="https://arxiv.org/pdf/2508.10104">DINOv3</a>. arXiv, 2025.</li>
+      <li>Hao Zhang et al. <a href="http://arxiv.org/pdf/2203.03605">DINO: DETR with Improved DeNoising Anchor Boxes for End-to-End Object Detection</a>. arXiv, 2022.</li>
+      <li>Marc-Antoine Lavoie et al. <a href="https://arxiv.org/abs/2503.23220">Large Self-Supervised Models Bridge the Gap in Domain Adaptive Object Detection</a>. arXiv, 2025.</li>
+      <li>Yuqiu Li et al. <a href="https://doi.org/10.1145/3604078.3604114">Semi-supervised Object Detection for Remote Sensing Images via Pseudo Labeling and Consistency Learning</a>. ACM, 2023.</li>
+      <li>Zewei Yang et al. <a href="https://doi.org/10.1109/IGARSS55030.2025.11243394">Dual-Criterion Pseudo Label Selection for Semi-Supervised Oriented Object Detection on Remote Sensing Images</a>. IGARSS, 2025.</li>
+      <li>Guoting Wei et al. <a href="https://arxiv.org/pdf/2505.03334">OS-W2S: An Automatic Labeling Engine for Language-Guided Open-Set Aerial Object Detection</a>. arXiv, 2025.</li>
+    </ol>
+    <p class="small">说明：本报告优先引用 ai4scholar 检索到的论文页面、arXiv PDF 或 DOI 链接。部分 2025-2026 年论文仍可能处于预印本或会议/期刊在线出版阶段，具体版本以链接中的原文为准。</p>
+  </section>
+
+  <p class="print-hint">本 HTML 为静态报告，可直接用浏览器打开或打印为 PDF。</p>
+</main>
+</body>
+</html>

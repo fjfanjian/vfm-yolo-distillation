@@ -33,12 +33,19 @@ from train_dinov3_objectness_pretrain import (
 )
 from ultralytics.models.yolo.detect import DetectionTrainer
 
+from vfm_yolo_distillation.background_contrast_targets import (
+    _BackgroundContrastRequest,
+    _BackgroundContrastSettings,
+    _build_background_contrast_targets,
+)
 from vfm_yolo_distillation.objectness_targets import (
     AreaThresholds,
     PeakIgnoreSettings,
+    SmallCenterTargetSettings,
     SmallGtWeightMapSettings,
     SmallGtWeights,
     build_peak_ignore_targets,
+    build_small_center_targets,
     build_small_gt_weight_map,
     weighted_soft_objectness_loss,
 )
@@ -53,6 +60,8 @@ AuxTargetMode = Literal[
     "peak_ignore_aware",
     "small_crop_soft",
     "small_tile_soft",
+    "small_center_soft",
+    "small_bg_contrast",
 ]
 
 
@@ -63,8 +72,10 @@ class AuxTargetSettings:
     negative_quantile: float
     small_gt: SmallGtWeightMapSettings
     peak: PeakIgnoreSettings
+    small_center: SmallCenterTargetSettings
     small_crop: SmallCropTargetSettings
     small_tile: SmallTileTargetSettings
+    small_bg_contrast: _BackgroundContrastSettings
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +157,10 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             return self._small_crop_soft_loss(logits, batch, images)
         if self.aux_settings.mode == "small_tile_soft":
             return self._small_tile_soft_loss(logits, batch, images)
+        if self.aux_settings.mode == "small_center_soft":
+            return self._small_center_soft_loss(logits, batch, images)
+        if self.aux_settings.mode == "small_bg_contrast":
+            return self._small_bg_contrast_loss(logits, batch, images)
         targets = self._teacher_targets(
             images, image_files(batch, images.shape[0]), tuple(logits.shape[-2:])
         )
@@ -162,6 +177,10 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
                 loss = self._small_crop_soft_loss(logits, batch, images)
             case "small_tile_soft":
                 loss = self._small_tile_soft_loss(logits, batch, images)
+            case "small_center_soft":
+                loss = self._small_center_soft_loss(logits, batch, images)
+            case "small_bg_contrast":
+                loss = self._small_bg_contrast_loss(logits, batch, images)
             case unreachable:
                 assert_never(unreachable)
         return loss
@@ -195,6 +214,56 @@ class DinoObjectnessAuxTrainer(DinoObjectnessPretrainTrainer):
             image_size_hw=(images.shape[-2], images.shape[-1]),
             settings=self.aux_settings.small_gt,
         )
+        return (
+            weighted_soft_objectness_loss(logits, targets, weights)
+            * self.objectness_settings.lambda_objectness
+        )
+
+    def _small_bg_contrast_loss(
+        self,
+        logits: torch.Tensor,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+    ) -> torch.Tensor:
+        teacher_targets = self._teacher_targets(
+            images,
+            image_files(batch, images.shape[0]),
+            tuple(logits.shape[-2:]),
+        )
+        labels, weights = _build_background_contrast_targets(
+            _BackgroundContrastRequest(
+                teacher_targets=teacher_targets,
+                batch_idx=tensor_value(batch, "batch_idx").to(device=logits.device),
+                bboxes_xywhn=tensor_value(batch, "bboxes").to(device=logits.device),
+                image_size_hw=(images.shape[-2], images.shape[-1]),
+                settings=self.aux_settings.small_bg_contrast,
+            ),
+        )
+        if weights.sum() <= 0:
+            return logits.sum() * 0.0
+        return (
+            weighted_soft_objectness_loss(logits, labels, weights)
+            * self.objectness_settings.lambda_objectness
+        )
+
+    def _small_center_soft_loss(
+        self,
+        logits: torch.Tensor,
+        batch: dict[str, BatchValue],
+        images: torch.Tensor,
+    ) -> torch.Tensor:
+        targets, weights = build_small_center_targets(
+            batch_idx=tensor_value(batch, "batch_idx"),
+            bboxes_xywhn=tensor_value(batch, "bboxes"),
+            image_size_hw=(images.shape[-2], images.shape[-1]),
+            target_hw=tuple(logits.shape[-2:]),
+            batch_size=images.shape[0],
+            settings=self.aux_settings.small_center,
+        )
+        targets = targets.to(device=logits.device)
+        weights = weights.to(device=logits.device)
+        if weights.sum() <= 0:
+            return logits.sum() * 0.0
         return (
             weighted_soft_objectness_loss(logits, targets, weights)
             * self.objectness_settings.lambda_objectness
@@ -548,6 +617,8 @@ def aux_target_mode(value: str) -> AuxTargetMode:
             | "peak_ignore_aware"
             | "small_crop_soft"
             | "small_tile_soft"
+            | "small_center_soft"
+            | "small_bg_contrast"
         ):
             return value
         case _:
@@ -582,6 +653,13 @@ def aux_target_settings_from_config(path: Path) -> AuxTargetSettings:
             negative_quantile=float(objectness.get("negative_quantile", 0.45)),
             peak_kernel=int(objectness.get("peak_kernel", 3)),
         ),
+        small_center=SmallCenterTargetSettings(
+            small_area_px=float(objectness.get("small_area_px", 1024.0)),
+            radius_cells=float(objectness.get("center_radius_cells", 2.0)),
+            sigma_cells=float(objectness.get("center_sigma_cells", 1.0)),
+            max_centers_per_image=int(objectness.get("max_centers_per_image", 64)),
+            weight=float(objectness.get("center_weight", 1.0)),
+        ),
         small_crop=SmallCropTargetSettings(
             small_area_px=float(objectness.get("small_area_px", 1024.0)),
             context_scale=float(objectness.get("crop_context_scale", 6.0)),
@@ -598,6 +676,13 @@ def aux_target_settings_from_config(path: Path) -> AuxTargetSettings:
             max_tiles_per_image=int(objectness.get("max_tiles_per_image", 4)),
             min_small_boxes=int(objectness.get("min_small_boxes_per_tile", 3)),
             weight=float(objectness.get("tile_weight", 1.0)),
+        ),
+        small_bg_contrast=_BackgroundContrastSettings(
+            small_area_px=float(objectness.get("small_area_px", 1024.0)),
+            ring_context_cells=int(objectness.get("bg_ring_context_cells", 2)),
+            positive_weight=float(objectness.get("bg_contrast_positive_weight", 2.0)),
+            background_weight=float(objectness.get("bg_contrast_background_weight", 0.5)),
+            max_boxes_per_image=int(objectness.get("max_bg_contrast_boxes_per_image", 64)),
         ),
     )
 

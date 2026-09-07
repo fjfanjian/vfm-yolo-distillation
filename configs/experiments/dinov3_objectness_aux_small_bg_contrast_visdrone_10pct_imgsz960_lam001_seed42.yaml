@@ -1,0 +1,44 @@
+name: yolo26n_dinov3_objectness_aux_small_bg_contrast_visdrone_10pct_imgsz960_lam001_seed42
+stage: objectness_auxiliary
+description: YOLO26n 10% VisDrone 960 training with DINOv3 small-object local background contrast auxiliary loss, lambda 0.01, seed 42.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 960
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/fj/vfm-yolo-distillation/runs/dinov3_objectness
+  name: yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_small_bg_contrast_lam001_seed42
+metrics:
+  - mAP50-95
+  - mAP50
+  - AP_small
+  - dino_objectness_loss
+objectness:
+  teacher_repo: /home/fj/dinov3
+  teacher_weights: /home/fj/dinov3/weights/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 448
+  teacher_patch_grid: 28
+  teacher_batch: 16
+  method: local_contrast
+  tile_size: 480
+  tile_stride: 240
+  student_layer: 16
+  student_dim: 64
+  lambda_objectness: 0.01
+  target_mode: small_bg_contrast
+  small_area_px: 1024
+  bg_ring_context_cells: 2
+  bg_contrast_positive_weight: 2.0
+  bg_contrast_background_weight: 0.5
+  max_bg_contrast_boxes_per_image: 64
+  cache: /home/fj/vfm-yolo-distillation/runs/dinov3_objectness/cache/small_bg_contrast_lam001_seed42_l16_imgsz960

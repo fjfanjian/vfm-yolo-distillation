@@ -1,0 +1,44 @@
+name: yolo26n_dinov3_objectness_aux_smallcenter_visdrone_10pct_imgsz960_lam001_seed42
+stage: objectness_auxiliary
+description: YOLO26n 10% VisDrone 960 supervised training with small-object Gaussian center objectness auxiliary loss, lambda 0.01, seed 42.
+student:
+  family: ultralytics
+  model: yolo26n.pt
+dataset:
+  config: configs/datasets/visdrone.yaml
+  label_budget: 10pct
+training:
+  image_size: 960
+  epochs: 120
+  batch: 16
+  device: 0
+  workers: 8
+  seed: 42
+outputs:
+  project: /home/fj/vfm-yolo-distillation/runs/dinov3_objectness
+  name: yolo26n_visdrone_10pct_imgsz960_dinov3_objaux_smallcenter_lam001_seed42
+metrics:
+  - mAP50-95
+  - mAP50
+  - AP_small
+  - dino_objectness_loss
+objectness:
+  teacher_repo: /home/fj/work/dinov3
+  teacher_weights: /home/fj/work/weights/dinov3/dinov3_vitb16_pretrain_lvd1689m-73cec8be.pth
+  teacher_arch: dinov3_vitb16
+  teacher_image_size: 448
+  teacher_patch_grid: 28
+  teacher_batch: 16
+  method: local_contrast
+  tile_size: 480
+  tile_stride: 240
+  student_layer: 16
+  student_dim: 64
+  lambda_objectness: 0.01
+  target_mode: small_center_soft
+  small_area_px: 1024
+  center_radius_cells: 2.0
+  center_sigma_cells: 1.0
+  max_centers_per_image: 64
+  center_weight: 1.0
+  cache: /home/fj/vfm-yolo-distillation/runs/dinov3_objectness/cache/smallcenter_lam001_seed42_l16_imgsz960

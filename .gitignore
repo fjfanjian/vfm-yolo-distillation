@@ -10,10 +10,15 @@ build/
 
 # Experiment outputs
 runs/
+runs_backup/
+run*.zip
 outputs/
 artifacts/
 wandb/
 mlruns/
+
+# Local browser/tooling artifacts
+.playwright-mcp/
 
 # Data and model weights
 /data/
